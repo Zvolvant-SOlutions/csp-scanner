@@ -1,11 +1,16 @@
 name: Refresh CSP data and deploy to Pages
 
+# Crons run in UTC and don't honor DST. We register both EDT and EST UTC
+# times for each target Eastern hour (10 AM and 2 PM), then gate each
+# run with a New-York-timezone check so only the correct firing
+# actually executes. Net result: refreshes at exactly 10 AM ET and
+# 2 PM ET on weekdays, year-round.
 on:
-  # 14:00 UTC ≈ 10:00 AM ET (EDT) | 09:00 ET (EST)
-  # 18:00 UTC ≈ 02:00 PM ET (EDT) | 13:00 ET (EST)
   schedule:
-    - cron: "0 14 * * 1-5"
-    - cron: "0 18 * * 1-5"
+    - cron: "0 14 * * 1-5"   # 10 AM ET (during EDT)
+    - cron: "0 15 * * 1-5"   # 10 AM ET (during EST)
+    - cron: "0 18 * * 1-5"   #  2 PM ET (during EDT)
+    - cron: "0 19 * * 1-5"   #  2 PM ET (during EST)
   workflow_dispatch: {}
   push:
     branches: [main]
@@ -29,27 +34,58 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    outputs:
+      should_run: ${{ steps.gate.outputs.run }}
     steps:
+      - name: Eastern-time gate (skip cron firings that aren't 10 AM / 2 PM ET)
+        id: gate
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Non-schedule event (${{ github.event_name }}) — running."
+            exit 0
+          fi
+          HOUR=$(TZ='America/New_York' date +%H)
+          DOW=$(TZ='America/New_York' date +%u)   # 1=Mon … 7=Sun
+          if [ "$DOW" -ge 6 ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping — it's weekend in New York."
+            exit 0
+          fi
+          if [ "$HOUR" = "10" ] || [ "$HOUR" = "14" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Current Eastern hour is $HOUR — running."
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Skipping — current Eastern hour is $HOUR (need 10 or 14)."
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
 
       - uses: actions/setup-python@v5
+        if: steps.gate.outputs.run == 'true'
         with:
           python-version: "3.11"
           cache: pip
 
       - name: Install deps
+        if: steps.gate.outputs.run == 'true'
         run: pip install -r requirements.txt
 
       - name: Fetch options data
+        if: steps.gate.outputs.run == 'true'
         run: python scripts/fetch.py
 
       - name: Upload Pages artifact
+        if: steps.gate.outputs.run == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
 
   deploy:
     needs: build
+    if: needs.build.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
