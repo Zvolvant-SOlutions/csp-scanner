@@ -1,0 +1,121 @@
+# Tickers to scan for cash-secured put opportunities.
+# One per line. Lines starting with # are ignored.
+# Default: liquid, large-cap optionable names + popular ETFs.
+
+# ===== Index ETFs =====
+SPY
+QQQ
+IWM
+DIA
+
+# ===== Mega-cap tech =====
+AAPL
+MSFT
+GOOGL
+AMZN
+META
+NVDA
+TSLA
+AVGO
+
+# ===== Large-cap tech =====
+AMD
+INTC
+CRM
+ORCL
+ADBE
+NFLX
+CSCO
+QCOM
+TXN
+MU
+AMAT
+LRCX
+PYPL
+SHOP
+UBER
+ABNB
+PLTR
+SNOW
+NOW
+
+# ===== Financials =====
+JPM
+BAC
+WFC
+GS
+MS
+C
+SCHW
+BLK
+AXP
+V
+MA
+
+# ===== Energy =====
+XOM
+CVX
+COP
+SLB
+OXY
+
+# ===== Healthcare / Biotech =====
+JNJ
+PFE
+UNH
+LLY
+ABBV
+MRK
+TMO
+ABT
+DHR
+
+# ===== Consumer =====
+WMT
+COST
+HD
+LOW
+TGT
+NKE
+SBUX
+MCD
+DIS
+KO
+PEP
+PG
+
+# ===== Industrials / Materials =====
+CAT
+BA
+DE
+HON
+GE
+LMT
+RTX
+UPS
+FDX
+
+# ===== Communications / Media =====
+T
+VZ
+TMUS
+CMCSA
+
+# ===== Semiconductors / High-vol favorites =====
+ARM
+SMCI
+MRVL
+ON
+
+# ===== China ADRs (high premium, conservative use) =====
+BABA
+PDD
+JD
+
+# ===== Other popular CSP names =====
+F
+GM
+RIVN
+SOFI
+COIN
+HOOD

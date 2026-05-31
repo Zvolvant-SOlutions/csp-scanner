@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CSP Scanner — Cash-Secured Put Opportunities</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  table { border-collapse: separate; border-spacing: 0; }
+  th { position: sticky; top: 0; z-index: 5; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { background-color: #e5e7eb; }
+  th .sort-indicator { display: inline-block; width: 0.7em; opacity: 0.4; }
+  th.sorted-asc .sort-indicator,
+  th.sorted-desc .sort-indicator { opacity: 1; color: #2563eb; }
+  tr.row:hover { background-color: #f9fafb; }
+  .num { font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 9999px;
+          font-size: 0.7rem; font-weight: 600; white-space: nowrap; }
+  .score-bar { width: 60px; height: 8px; background: #e5e7eb;
+               border-radius: 4px; overflow: hidden; }
+  .score-bar > div { height: 100%; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<header class="border-b border-slate-200 bg-white">
+  <div class="max-w-screen-2xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold">CSP Scanner</h1>
+      <p class="text-xs text-slate-500">
+        Cash-secured put opportunities — strict ≤15% delta, ≤21 DTE, earnings-aware
+      </p>
+    </div>
+    <div class="text-right text-xs text-slate-500">
+      <div>Last updated: <span id="last-updated" class="font-mono text-slate-700">—</span></div>
+      <div id="elapsed-info" class="text-slate-400"></div>
+    </div>
+  </div>
+</header>
+
+<!-- Summary cards -->
+<section class="max-w-screen-2xl mx-auto px-6 py-4">
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div class="bg-white rounded-lg border border-slate-200 p-3">
+      <div class="text-[11px] text-slate-500 uppercase tracking-wider">Tickers Scanned</div>
+      <div class="text-2xl font-semibold mt-1 num" id="card-scanned">—</div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-3">
+      <div class="text-[11px] text-slate-500 uppercase tracking-wider">Accepted</div>
+      <div class="text-2xl font-semibold mt-1 text-emerald-600 num" id="card-accepted">—</div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-3">
+      <div class="text-[11px] text-slate-500 uppercase tracking-wider">Rejected</div>
+      <div class="text-2xl font-semibold mt-1 text-slate-500 num" id="card-rejected">—</div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-3">
+      <div class="text-[11px] text-slate-500 uppercase tracking-wider">Missing Delta</div>
+      <div class="text-2xl font-semibold mt-1 text-amber-600 num" id="card-missing-delta">—</div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-3">
+      <div class="text-[11px] text-slate-500 uppercase tracking-wider">Missing Earnings</div>
+      <div class="text-2xl font-semibold mt-1 text-amber-600 num" id="card-missing-earnings">—</div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-3">
+      <div class="text-[11px] text-slate-500 uppercase tracking-wider">Tickers Failed</div>
+      <div class="text-2xl font-semibold mt-1 text-rose-600 num" id="card-failed">—</div>
+    </div>
+  </div>
+</section>
+
+<!-- Tabs -->
+<section class="max-w-screen-2xl mx-auto px-6">
+  <div class="flex flex-wrap gap-2 border-b border-slate-200" id="tabs">
+    <button data-tab="best"       class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-700">Best Overall</button>
+    <button data-tab="safest"     class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Safest Delta</button>
+    <button data-tab="ann"        class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Highest Annualized</button>
+    <button data-tab="cushion"    class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Best Cushion</button>
+    <button data-tab="liquidity"  class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Best Liquidity</button>
+    <button data-tab="earnsafe"   class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Earnings-Safe</button>
+    <button data-tab="rejected"   class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Rejected / Landmines</button>
+  </div>
+</section>
+
+<!-- Filters -->
+<section class="max-w-screen-2xl mx-auto px-6 py-3" id="filters-section">
+  <div class="bg-white rounded-lg border border-slate-200 p-3">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-sm">
+      <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Ticker search</span>
+        <input id="f-search" type="text" placeholder="AAPL, MSFT…"
+               class="border border-slate-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Max delta %</span>
+        <input id="f-max-delta" type="number" step="0.5" value="15"
+               class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Max DTE</span>
+        <input id="f-max-dte" type="number" step="1" value="21"
+               class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Min open interest</span>
+        <input id="f-min-oi" type="number" step="50" value="100"
+               class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Max spread %</span>
+        <input id="f-max-spread" type="number" step="1" value="20"
+               class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex items-end gap-2 pb-1">
+        <input id="f-exclude-earn" type="checkbox" checked class="h-4 w-4" />
+        <span class="text-sm">Exclude earnings before expiry</span>
+      </label>
+    </div>
+  </div>
+</section>
+
+<!-- Table -->
+<section class="max-w-screen-2xl mx-auto px-6 pb-12">
+  <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+    <div class="overflow-x-auto" id="table-wrap">
+      <table class="w-full text-sm">
+        <thead id="table-head" class="bg-slate-100 text-slate-700"></thead>
+        <tbody id="table-body" class="divide-y divide-slate-100"></tbody>
+      </table>
+    </div>
+    <div id="empty-state" class="hidden p-10 text-center text-slate-500">
+      No contracts match the current filters.
+    </div>
+    <div class="p-3 text-xs text-slate-500 border-t border-slate-200 flex justify-between">
+      <span id="row-count">—</span>
+      <span class="text-slate-400">Premium basis: bid (conservative)</span>
+    </div>
+  </div>
+</section>
+
+<footer class="max-w-screen-2xl mx-auto px-6 pb-8 text-xs text-slate-400">
+  Data via Yahoo Finance (yfinance). Delta computed via Black-Scholes
+  (yfinance does not return greeks). Not investment advice — verify in your broker before trading.
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
