@@ -65,6 +65,8 @@
       render: (r) => spreadCell(r.spread_pct) },
     { key: "cash_required", label: "Cash Req", type: "number", align: "right",
       render: (r) => fmtMoney(r.cash_required, 0) },
+    { key: "premium_dollars", label: "Prem $", type: "number", align: "right",
+      render: (r) => `<span class="text-emerald-700 font-medium">${fmtMoney(r.premium_dollars, 0)}</span>` },
     { key: "breakeven", label: "Breakeven", type: "number", align: "right",
       render: (r) => fmtMoney(r.breakeven) },
     { key: "assignment_discount_pct", label: "Cushion", type: "number", align: "right",
@@ -189,7 +191,11 @@
       if (!dataResp.ok) throw new Error(`data.json: ${dataResp.status}`);
       const data = await dataResp.json();
       const meta = metaResp.ok ? await metaResp.json() : {};
-      state.accepted = data.accepted || [];
+      state.accepted = (data.accepted || []).map((r) => ({
+        ...r,
+        // Dollars collected per CSP contract (one contract = 100 shares).
+        premium_dollars: Math.round((r.premium || 0) * 100),
+      }));
       state.rejected = data.rejected || [];
       state.meta = meta;
     } catch (err) {
