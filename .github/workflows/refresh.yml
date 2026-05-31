@@ -1,23 +1,32 @@
-name: Refresh CSP data
+name: Refresh CSP data and deploy to Pages
 
 on:
   # 14:00 UTC ≈ 10:00 AM ET (EDT) | 09:00 ET (EST)
   # 18:00 UTC ≈ 02:00 PM ET (EDT) | 13:00 ET (EST)
-  # During EST winter, runs shift one hour earlier in local time.
   schedule:
     - cron: "0 14 * * 1-5"
     - cron: "0 18 * * 1-5"
   workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "scripts/**"
+      - "config/**"
+      - "requirements.txt"
+      - ".github/workflows/refresh.yml"
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: refresh-csp-data
+  group: pages
   cancel-in-progress: false
 
 jobs:
-  refresh:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -34,22 +43,18 @@ jobs:
       - name: Fetch options data
         run: python scripts/fetch.py
 
-      - name: Commit refreshed data
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/data.json docs/meta.json
-          if git diff --cached --quiet; then
-            echo "No data changes."
-            exit 0
-          fi
-          git commit -m "data: refresh $(date -u +'%Y-%m-%d %H:%M UTC')"
-          git push
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
 
-  pages-build:
-    needs: refresh
+  deploy:
+    needs: build
     runs-on: ubuntu-latest
-    # GitHub Pages will auto-rebuild on push to /docs; this job is a no-op
-    # placeholder you can wire up later if you switch to the new Pages action.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - run: echo "Pages will auto-rebuild from /docs on push."
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

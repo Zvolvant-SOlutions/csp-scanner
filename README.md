@@ -112,18 +112,20 @@ fetch.
 
 ## Deploying to GitHub Pages
 
-1. Push this repo to GitHub (public).
-2. **Settings → Pages** → Source: **Deploy from a branch** →
-   Branch: `main` / Folder: **`/docs`** → Save.
-3. **Settings → Actions → General** → Workflow permissions:
-   **Read and write permissions** → Save. (Required so the cron job can
-   commit refreshed `data.json` back to the repo.)
-4. Wait a couple of minutes; your site goes live at
-   `https://<your-user>.github.io/<repo-name>/`.
-5. The cron runs twice every weekday and auto-commits new data.
+This repo is already wired up. The workflow (`.github/workflows/refresh.yml`)
+fetches fresh data **inside** the Action, then uploads the generated
+`docs/` folder as a Pages artifact and deploys it via
+`actions/deploy-pages`. No commits are pushed back to `main` — the live
+data lives in the deployed Pages artifact.
 
-To trigger a refresh on demand: **Actions → Refresh CSP data →
-Run workflow**.
+To set this up from scratch:
+
+1. Push the repo to GitHub (public).
+2. **Settings → Pages** → Source: **GitHub Actions** → Save.
+3. Done — the workflow runs on push, twice a day on weekdays, and
+   on-demand via **Actions → Refresh CSP data and deploy → Run workflow**.
+
+Live URL: `https://<org>.github.io/<repo>/`
 
 ---
 
