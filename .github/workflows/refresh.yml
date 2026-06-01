@@ -73,9 +73,13 @@ jobs:
         if: steps.gate.outputs.run == 'true'
         run: pip install -r requirements.txt
 
-      - name: Fetch options data
+      - name: Fetch options data — curated universe
         if: steps.gate.outputs.run == 'true'
-        run: python scripts/fetch.py
+        run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs --label "Curated"
+
+      - name: Fetch options data — S&P 500
+        if: steps.gate.outputs.run == 'true'
+        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/sp500 --label "S&P 500"
 
       - name: Upload Pages artifact
         if: steps.gate.outputs.run == 'true'

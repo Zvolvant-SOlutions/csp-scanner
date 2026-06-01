@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CSP Scanner — Cash-Secured Put Opportunities</title>
+<title>CSP Scanner (S&P 500) — Cash-Secured Put Opportunities</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -39,9 +39,9 @@
 <header class="border-b border-slate-200 bg-white">
   <div class="max-w-screen-2xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-3">
     <div>
-      <h1 class="text-xl font-semibold">CSP Scanner</h1>
+      <h1 class="text-xl font-semibold">CSP Scanner — S&amp;P 500</h1>
       <p class="text-xs text-slate-500">
-        Cash-secured put opportunities — strict ≤15% delta, ≤21 DTE, earnings-aware
+        All 500 S&amp;P constituents — strict ≤15% delta, ≤21 DTE, earnings-aware
       </p>
     </div>
     <div class="text-right text-xs text-slate-500">
@@ -50,8 +50,8 @@
     </div>
   </div>
   <nav class="max-w-screen-2xl mx-auto px-6 pb-3 text-sm flex gap-2">
-    <span class="px-3 py-1 rounded-full bg-blue-600 text-white font-medium">Curated universe</span>
-    <a href="sp500/" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">S&amp;P 500 →</a>
+    <a href="../" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">← Curated universe</a>
+    <span class="px-3 py-1 rounded-full bg-blue-600 text-white font-medium">S&amp;P 500</span>
   </nav>
 </header>
 
@@ -159,6 +159,6 @@
   (yfinance does not return greeks). Not investment advice — verify in your broker before trading.
 </footer>
 
-<script src="app.js"></script>
+<script src="../app.js"></script>
 </body>
 </html>

@@ -13,6 +13,7 @@ Run:
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import os
@@ -43,9 +44,8 @@ CONFIG = {
 }
 
 ROOT = Path(__file__).resolve().parent.parent
-TICKERS_FILE = ROOT / "config" / "tickers.txt"
-DATA_OUT = ROOT / "docs" / "data.json"
-META_OUT = ROOT / "docs" / "meta.json"
+DEFAULT_TICKERS = ROOT / "config" / "tickers.txt"
+DEFAULT_OUT_DIR = ROOT / "docs"
 
 
 # ---------------------------------------------------------------------------
@@ -381,12 +381,12 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
 # ---------------------------------------------------------------------------
 # Entry point.
 # ---------------------------------------------------------------------------
-def load_tickers() -> list[str]:
-    if not TICKERS_FILE.exists():
-        print(f"[fatal] tickers file missing: {TICKERS_FILE}", file=sys.stderr)
+def load_tickers(path: Path) -> list[str]:
+    if not path.exists():
+        print(f"[fatal] tickers file missing: {path}", file=sys.stderr)
         sys.exit(1)
     out = []
-    for line in TICKERS_FILE.read_text().splitlines():
+    for line in path.read_text().splitlines():
         s = line.strip()
         if not s or s.startswith("#"):
             continue
@@ -401,9 +401,22 @@ def load_tickers() -> list[str]:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--tickers", type=Path, default=DEFAULT_TICKERS,
+                        help="Path to a ticker file (one symbol per line).")
+    parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR,
+                        help="Directory to write data.json and meta.json into.")
+    parser.add_argument("--label", default="",
+                        help="Free-text label written into meta.json.")
+    args = parser.parse_args()
+
+    data_out = args.out_dir / "data.json"
+    meta_out = args.out_dir / "meta.json"
+
     start = time.time()
-    tickers = load_tickers()
-    print(f"[info] scanning {len(tickers)} tickers", flush=True)
+    tickers = load_tickers(args.tickers)
+    print(f"[info] scanning {len(tickers)} tickers from {args.tickers.name}"
+          f" -> {args.out_dir}", flush=True)
 
     all_accepted: list[dict] = []
     all_rejected: list[dict] = []
@@ -439,14 +452,15 @@ def main() -> int:
     missing_earnings = sum(1 for c in all_accepted
                            if not c.get("next_earnings"))
 
-    DATA_OUT.parent.mkdir(parents=True, exist_ok=True)
-    DATA_OUT.write_text(json.dumps(
+    data_out.parent.mkdir(parents=True, exist_ok=True)
+    data_out.write_text(json.dumps(
         {"accepted": all_accepted, "rejected": all_rejected},
         indent=2, default=str,
     ))
 
     meta = {
         "last_updated": datetime.now(timezone.utc).isoformat(),
+        "label": args.label,
         "tickers_scanned": len(tickers),
         "accepted_count": len(all_accepted),
         "rejected_count": len(all_rejected),
@@ -457,7 +471,7 @@ def main() -> int:
         "config": CONFIG,
         "elapsed_seconds": round(time.time() - start, 1),
     }
-    META_OUT.write_text(json.dumps(meta, indent=2, default=str))
+    meta_out.write_text(json.dumps(meta, indent=2, default=str))
 
     print(f"[done] {len(all_accepted)} accepted, {len(all_rejected)} rejected"
           f" in {meta['elapsed_seconds']}s")
