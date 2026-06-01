@@ -49,9 +49,10 @@
       <div id="elapsed-info" class="text-slate-400"></div>
     </div>
   </div>
-  <nav class="max-w-screen-2xl mx-auto px-6 pb-3 text-sm flex gap-2">
+  <nav class="max-w-screen-2xl mx-auto px-6 pb-3 text-sm flex flex-wrap gap-2 items-center">
     <span class="px-3 py-1 rounded-full bg-blue-600 text-white font-medium">Curated universe</span>
     <a href="sp500/" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">S&amp;P 500 →</a>
+    <a href="#how-it-works" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">ⓘ How scoring works</a>
   </nav>
 </header>
 
@@ -151,6 +152,74 @@
       <span id="row-count">—</span>
       <span class="text-slate-400">Premium basis: bid (conservative)</span>
     </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section id="how-it-works" class="max-w-screen-2xl mx-auto px-6 pb-8">
+  <div class="bg-white rounded-lg border border-slate-200 p-6">
+    <h2 class="text-lg font-semibold mb-2">How the score works</h2>
+    <p class="text-sm text-slate-600 mb-4">
+      Every contract is screened through hard filters first, then the survivors
+      are scored <span class="font-semibold">0&ndash;100</span> across five
+      components. Higher score = a better fit for a conservative cash-secured-put
+      strategy.
+    </p>
+
+    <h3 class="text-sm font-semibold text-slate-700 mt-4 mb-2">Hard filters (excluded before scoring)</h3>
+    <ul class="list-disc list-inside text-sm text-slate-600 space-y-1">
+      <li>Put options only, expiring within 21 calendar days</li>
+      <li>Absolute delta &le; 15%</li>
+      <li>Bid &gt; $0, open interest &ge; 100</li>
+      <li>Bid/ask spread &le; 20% of the mid price</li>
+      <li>Earnings before expiration (excluded by default; toggle in filters)</li>
+      <li>All of: bid, ask, last price, OI, volume, strike, expiry, IV must be present</li>
+    </ul>
+
+    <h3 class="text-sm font-semibold text-slate-700 mt-6 mb-2">Score components (max 100 pts)</h3>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm border border-slate-200 rounded">
+        <thead class="bg-slate-100 text-slate-700">
+          <tr>
+            <th class="px-3 py-2 text-left">Component</th>
+            <th class="px-3 py-2 text-right">Max pts</th>
+            <th class="px-3 py-2 text-left">What earns the points</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr>
+            <td class="px-3 py-2 font-medium">Premium efficiency</td>
+            <td class="px-3 py-2 text-right num">25</td>
+            <td class="px-3 py-2 text-slate-600">Higher <em>annualized</em> return on the cash you set aside. Computed as <span class="font-mono text-xs">premium &divide; strike &times; 365 &divide; DTE</span>. Roughly 50% annualized earns full points; uses the conservative <em>bid</em> price by default.</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-2 font-medium">Assignment cushion</td>
+            <td class="px-3 py-2 text-right num">25</td>
+            <td class="px-3 py-2 text-slate-600">Bigger discount from today&rsquo;s stock price to the strike. <span class="font-mono text-xs">(price &minus; strike) &divide; price</span>. 15% cushion = full points; smaller cushions scale linearly.</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-2 font-medium">Delta safety</td>
+            <td class="px-3 py-2 text-right num">20</td>
+            <td class="px-3 py-2 text-slate-600">Lower delta (lower assignment probability) earns more. 0% delta &rarr; full 20 pts; the 15% cap &rarr; 0 pts.</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-2 font-medium">Liquidity</td>
+            <td class="px-3 py-2 text-right num">15</td>
+            <td class="px-3 py-2 text-slate-600">Open interest (up to 10 pts, log-scaled: 100 OI = ~5 pts, 10,000 OI = 10 pts) plus tight bid/ask spread (up to 5 pts).</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-2 font-medium">Earnings risk</td>
+            <td class="px-3 py-2 text-right num">15</td>
+            <td class="px-3 py-2 text-slate-600">No earnings within 30 days &rarr; full 15 pts. Earnings shortly after expiry &rarr; 8 pts. Earnings before expiry &rarr; 0 pts (and usually filtered out entirely). Unknown earnings date &rarr; mild 12-pt penalty.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="text-xs text-slate-500 mt-4">
+      Each ticker shows at most its top 3 contracts. The overall rank in column &ldquo;#&rdquo;
+      is the global ordering by score across every accepted contract.
+    </p>
   </div>
 </section>
 
