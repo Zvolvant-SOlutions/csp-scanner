@@ -1,16 +1,12 @@
 name: Refresh CSP data and deploy to Pages
 
-# Crons run in UTC and don't honor DST. We register both EDT and EST UTC
-# times for each target Eastern hour (10 AM and 2 PM), then gate each
-# run with a New-York-timezone check so only the correct firing
-# actually executes. Net result: refreshes at exactly 10 AM ET and
-# 2 PM ET on weekdays, year-round.
+# Refresh is triggered externally at 10 AM and 2 PM ET on weekdays by macOS
+# launchd jobs running on the host workstation
+# (~/Library/LaunchAgents/com.zvolvant.csp-refresh-{am,pm}.plist), which call
+# `gh workflow run refresh.yml`. We rely on launchd instead of GHA `schedule:`
+# because GitHub Actions does not guarantee schedule timing — 5–30 min delays
+# at the top of the hour are common and runs are sometimes dropped entirely.
 on:
-  schedule:
-    - cron: "0 14 * * 1-5"   # 10 AM ET (during EDT)
-    - cron: "0 15 * * 1-5"   # 10 AM ET (during EST)
-    - cron: "0 18 * * 1-5"   #  2 PM ET (during EDT)
-    - cron: "0 19 * * 1-5"   #  2 PM ET (during EST)
   workflow_dispatch: {}
   push:
     branches: [main]
