@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CSP Scanner — Dip Buys</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  table { border-collapse: separate; border-spacing: 0; }
+  th { position: sticky; top: 0; z-index: 5; }
+  th.sortable { cursor: pointer; user-select: none; }
+  th.sortable:hover { background-color: #e5e7eb; }
+  th .sort-indicator { display: inline-block; width: 0.7em; opacity: 0.4; }
+  th.sorted-asc .sort-indicator,
+  th.sorted-desc .sort-indicator { opacity: 1; color: #2563eb; }
+  tr.row:hover { background-color: #f9fafb; }
+  .num { font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 9999px;
+          font-size: 0.7rem; font-weight: 600; white-space: nowrap; }
+  .score-bar { width: 60px; height: 8px; background: #e5e7eb;
+               border-radius: 4px; overflow: hidden; }
+  .score-bar > div { height: 100%; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+<header class="border-b border-slate-200 bg-white">
+  <div class="max-w-screen-2xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h1 class="text-xl font-semibold">CSP Scanner — Dip Buys <span class="text-rose-500">🔴</span></h1>
+      <p class="text-xs text-slate-500">
+        Today's biggest S&amp;P 500 losers — scan CSPs on oversold stocks with elevated IV
+      </p>
+    </div>
+    <div class="text-right text-xs text-slate-500">
+      <div>Last updated: <span id="last-updated" class="font-mono text-slate-700">—</span></div>
+      <div id="elapsed-info" class="text-slate-400"></div>
+    </div>
+  </div>
+  <nav class="max-w-screen-2xl mx-auto px-6 pb-3 text-sm flex flex-wrap gap-2 items-center">
+    <a href="../" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">Curated</a>
+    <a href="../sp500/" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">S&amp;P 500</a>
+    <span class="px-3 py-1 rounded-full bg-rose-600 text-white font-medium">Dip Buys</span>
+    <a href="#how-it-works" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">ⓘ Strategy</a>
+  </nav>
+</header>
+
+<!-- Today's losers strip -->
+<div class="max-w-screen-2xl mx-auto px-6 pt-3">
+  <div class="bg-rose-50 border border-rose-200 rounded-lg p-3">
+    <div class="text-[11px] text-rose-700 uppercase tracking-wider font-semibold mb-2">Today's Biggest Losers (scanned)</div>
+    <div id="loser-badges" class="flex flex-wrap gap-2 text-xs">
+      <span class="text-rose-400 italic">Loading…</span>
+    </div>
+  </div>
+</div>
+
+<!-- Summary cards -->
+<section class="max-w-screen-2xl mx-auto px-6 py-4">
+  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div class="bg-white rounded-lg border border-slate-200 p-3">
+      <div class="text-[11px] text-slate-500 uppercase tracking-wider">Stocks Analyzed</div>
+      <div class="text-2xl font-semibold mt-1 num" id="card-scanned">—</div>
+    </div>
+    <div class="bg-white rounded-lg border border-rose-200 p-3">
+      <div class="text-[11px] text-rose-500 uppercase tracking-wider">Avg Day Drop</div>
+      <div class="text-2xl font-semibold mt-1 text-rose-600 num" id="card-drop">—</div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-3">
+      <div class="text-[11px] text-slate-500 uppercase tracking-wider">Accepted Contracts</div>
+      <div class="text-2xl font-semibold mt-1 text-emerald-600 num" id="card-accepted">—</div>
+    </div>
+    <div class="bg-white rounded-lg border border-slate-200 p-3">
+      <div class="text-[11px] text-slate-500 uppercase tracking-wider">Rejected</div>
+      <div class="text-2xl font-semibold mt-1 text-slate-500 num" id="card-rejected">—</div>
+    </div>
+    <div class="bg-white rounded-lg border border-violet-200 p-3">
+      <div class="text-[11px] text-violet-600 uppercase tracking-wider">Vol Spikes (&gt;2x)</div>
+      <div class="text-2xl font-semibold mt-1 text-violet-700 num" id="card-volspike">—</div>
+    </div>
+    <div class="bg-white rounded-lg border border-amber-200 p-3">
+      <div class="text-[11px] text-amber-600 uppercase tracking-wider">Near 52W Low</div>
+      <div class="text-2xl font-semibold mt-1 text-amber-700 num" id="card-nearlow">—</div>
+    </div>
+  </div>
+</section>
+
+<!-- Tabs -->
+<section class="max-w-screen-2xl mx-auto px-6">
+  <div class="flex flex-wrap gap-2 border-b border-slate-200" id="tabs">
+    <button data-tab="dip"      class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-700">Biggest Drops</button>
+    <button data-tab="best"     class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Best Score</button>
+    <button data-tab="ann"      class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Highest Premium</button>
+    <button data-tab="nearlow"  class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Near 52W Low</button>
+    <button data-tab="volspike" class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Vol Spike</button>
+    <button data-tab="earnsafe" class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Earnings-Safe</button>
+    <button data-tab="rejected" class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Rejected</button>
+  </div>
+</section>
+
+<!-- Filters -->
+<section class="max-w-screen-2xl mx-auto px-6 py-3" id="filters-section">
+  <div class="bg-white rounded-lg border border-slate-200 p-3">
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-sm">
+      <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Ticker search</span>
+        <input id="f-search" type="text" placeholder="AAPL, NVDA…"
+               class="border border-slate-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Max delta %</span>
+        <input id="f-max-delta" type="number" step="0.5" value="20"
+               class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Max DTE</span>
+        <input id="f-max-dte" type="number" step="1" value="21"
+               class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Min open interest</span>
+        <input id="f-min-oi" type="number" step="50" value="100"
+               class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Max spread %</span>
+        <input id="f-max-spread" type="number" step="1" value="20"
+               class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex items-end gap-2 pb-1">
+        <input id="f-exclude-earn" type="checkbox" checked class="h-4 w-4" />
+        <span class="text-sm">Exclude earnings before expiry</span>
+      </label>
+    </div>
+  </div>
+</section>
+
+<!-- Table -->
+<section class="max-w-screen-2xl mx-auto px-6 pb-12">
+  <div class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+    <div class="overflow-x-auto" id="table-wrap">
+      <table class="w-full text-sm">
+        <thead id="table-head" class="bg-slate-100 text-slate-700"></thead>
+        <tbody id="table-body" class="divide-y divide-slate-100"></tbody>
+      </table>
+    </div>
+    <div id="empty-state" class="hidden p-10 text-center text-slate-500">
+      No contracts match the current filters.
+    </div>
+    <div class="p-3 text-xs text-slate-500 border-t border-slate-200 flex justify-between">
+      <span id="row-count">—</span>
+      <span class="text-slate-400">Premium basis: bid (conservative)</span>
+    </div>
+  </div>
+</section>
+
+<!-- Strategy explanation -->
+<section id="how-it-works" class="max-w-screen-2xl mx-auto px-6 pb-8">
+  <div class="bg-white rounded-lg border border-slate-200 p-6">
+    <h2 class="text-lg font-semibold mb-2">Dip Buy CSP Strategy</h2>
+    <p class="text-sm text-slate-600 mb-4">
+      This page identifies the <strong>top 20 S&amp;P 500 stocks by single-day percentage decline</strong>
+      and surfaces cash-secured put opportunities on those names. The mean-reversion thesis:
+      oversold stocks tend to bounce, and selling puts captures <em>elevated IV</em>
+      while giving you a strike that's already discounted from a lower stock price.
+    </p>
+
+    <h3 class="text-sm font-semibold text-slate-700 mt-4 mb-2">Extra columns on this page</h3>
+    <div class="overflow-x-auto mb-4">
+      <table class="w-full text-sm border border-slate-200 rounded">
+        <thead class="bg-slate-100 text-slate-700">
+          <tr>
+            <th class="px-3 py-2 text-left">Column</th>
+            <th class="px-3 py-2 text-left">What it means</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          <tr>
+            <td class="px-3 py-2 font-medium">Day Chg</td>
+            <td class="px-3 py-2 text-slate-600">Today's % price change. Deeper red = bigger drop. Darker shading at &le;−5%.</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-2 font-medium">Vol Ratio</td>
+            <td class="px-3 py-2 text-slate-600">Today's volume &div; 30-day average volume. &ge;2× signals unusually high selling pressure (potential capitulation); shown in blue/violet.</td>
+          </tr>
+          <tr>
+            <td class="px-3 py-2 font-medium">↑52W Lo</td>
+            <td class="px-3 py-2 text-slate-600">How far the current price sits above the 52-week low. Low values (red) mean the stock is near its annual floor — more cautious territory; high values mean today's drop is a blip in an otherwise healthy trend.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="text-sm font-semibold text-slate-700 mt-4 mb-2">What to watch for</h3>
+    <ul class="list-disc list-inside text-sm text-slate-600 space-y-1">
+      <li><strong>Vol Spike ≥2×</strong> — heavy selling may indicate capitulation and a near-term floor.</li>
+      <li><strong>High ↑52W Lo (≥20%)</strong> — stock still well above its annual low; today's drop is likely news-driven or sector rotation rather than a structural breakdown.</li>
+      <li><strong>Earnings-cleared</strong> — if earnings just passed, IV is elevated from the run-up but drops aren't earnings risk — good premium, lower binary risk.</li>
+      <li><strong>Avoid: near 52W low + unknown earnings</strong> — catching a falling knife with earnings uncertainty is the highest-risk combination.</li>
+      <li><strong>IV is elevated after a drop</strong> — that means more premium but also faster IV crush if the stock stabilizes. Close early at 50% profit rather than holding to expiry.</li>
+    </ul>
+
+    <h3 class="text-sm font-semibold text-slate-700 mt-6 mb-2">Hard filters (same as main scanner)</h3>
+    <ul class="list-disc list-inside text-sm text-slate-600 space-y-1">
+      <li>Put options only, expiring within 21 calendar days</li>
+      <li>Absolute delta &le; 20% (slightly wider than the base scanner to account for inflated IV)</li>
+      <li>Bid &gt; $0, open interest &ge; 100</li>
+      <li>Bid/ask spread &le; 20% of the mid price</li>
+      <li>Earnings before expiration excluded by default</li>
+    </ul>
+  </div>
+</section>
+
+<footer class="max-w-screen-2xl mx-auto px-6 pb-8 text-xs text-slate-400">
+  Data via Yahoo Finance (yfinance). Delta computed via Black-Scholes. Not investment advice — verify in your broker before trading.
+</footer>
+
+<script src="dip-app.js"></script>
+</body>
+</html>

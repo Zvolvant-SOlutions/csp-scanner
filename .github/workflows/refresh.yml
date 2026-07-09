@@ -29,7 +29,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     outputs:
       should_run: ${{ steps.gate.outputs.run }}
     steps:
@@ -76,6 +76,10 @@ jobs:
       - name: Fetch options data — S&P 500
         if: steps.gate.outputs.run == 'true'
         run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/sp500 --label "S&P 500"
+
+      - name: Fetch options data — Dip Buys (top 20 daily losers)
+        if: steps.gate.outputs.run == 'true'
+        run: python scripts/fetch_dip.py --sp500-tickers config/tickers_sp500.txt --out-dir docs/dip --label "Dip Buys"
 
       - name: Upload Pages artifact
         if: steps.gate.outputs.run == 'true'
