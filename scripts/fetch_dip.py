@@ -185,6 +185,28 @@ def score_contract(c: dict) -> tuple[float, list[str]]:
 # ---------------------------------------------------------------------------
 # Phase 1 — bulk download to identify biggest daily losers.
 # ---------------------------------------------------------------------------
+def _download_batch(batch: list[str], retries: int = 3) -> pd.DataFrame | None:
+    """Download a batch of tickers with exponential-backoff retry on rate limit."""
+    for attempt in range(retries):
+        try:
+            df = yf.download(
+                batch,
+                period="30d",
+                auto_adjust=True,
+                progress=False,
+            )
+            return df
+        except Exception as e:
+            if attempt < retries - 1:
+                wait = 2 ** attempt * 3  # 3s, 6s, 12s
+                print(f"[phase1] batch failed ({e}), retry in {wait}s…", flush=True)
+                time.sleep(wait)
+            else:
+                print(f"[phase1] batch gave up after {retries} attempts: {e}",
+                      file=sys.stderr)
+    return None
+
+
 def get_loser_metrics(
     sp500_tickers: list[str],
     top_n: int,
@@ -195,30 +217,47 @@ def get_loser_metrics(
     for the top_n S&P 500 tickers with the worst single-day % change,
     provided the drop is at least min_drop %.
     """
-    print(f"[phase1] bulk-downloading 30d OHLCV for {len(sp500_tickers)} tickers…",
-          flush=True)
-    try:
-        raw = yf.download(
-            sp500_tickers,
-            period="30d",
-            auto_adjust=True,
-            progress=False,
-        )
-    except Exception as e:
-        print(f"[phase1] bulk download failed: {e}", file=sys.stderr)
+    batch_size = 100
+    batches = [sp500_tickers[i:i + batch_size]
+               for i in range(0, len(sp500_tickers), batch_size)]
+    print(f"[phase1] downloading 30d OHLCV for {len(sp500_tickers)} tickers "
+          f"in {len(batches)} batches…", flush=True)
+
+    closes_frames: list[pd.DataFrame] = []
+    volumes_frames: list[pd.DataFrame] = []
+
+    for idx, batch in enumerate(batches, 1):
+        raw = _download_batch(batch)
+        if raw is None or raw.empty:
+            print(f"[phase1] batch {idx}/{len(batches)} empty — skipping", flush=True)
+            continue
+
+        # yfinance returns a MultiIndex when >1 ticker, Series for a single one.
+        try:
+            batch_closes = raw["Close"]
+            batch_volumes = raw["Volume"]
+        except KeyError:
+            print(f"[phase1] batch {idx} unexpected shape — skipping", flush=True)
+            continue
+
+        if isinstance(batch_closes, pd.Series):
+            batch_closes = batch_closes.to_frame(name=batch[0])
+            batch_volumes = batch_volumes.to_frame(name=batch[0])
+
+        closes_frames.append(batch_closes)
+        volumes_frames.append(batch_volumes)
+        print(f"[phase1] batch {idx}/{len(batches)}: "
+              f"{batch_closes.shape[1]} tickers, {len(batch_closes)} rows", flush=True)
+
+        if idx < len(batches):
+            time.sleep(1)  # brief pause between batches
+
+    if not closes_frames:
+        print("[phase1] no data from any batch", file=sys.stderr)
         return {}
 
-    try:
-        closes = raw["Close"]
-        volumes = raw["Volume"]
-    except KeyError as e:
-        print(f"[phase1] unexpected data shape: {e}", file=sys.stderr)
-        return {}
-
-    # Ensure DataFrame (yfinance returns Series for single ticker).
-    if isinstance(closes, pd.Series):
-        closes = closes.to_frame(name=sp500_tickers[0])
-        volumes = volumes.to_frame(name=sp500_tickers[0])
+    closes = pd.concat(closes_frames, axis=1)
+    volumes = pd.concat(volumes_frames, axis=1)
 
     if len(closes) < 2:
         print("[phase1] not enough rows in bulk data", file=sys.stderr)
