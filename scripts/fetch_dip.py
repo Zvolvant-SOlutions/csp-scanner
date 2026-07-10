@@ -99,11 +99,17 @@ def bs_put_delta(spot: float, strike: float, t_years: float,
         return None
 
 
-def safe_get_info(tk: yf.Ticker) -> dict:
-    try:
-        return tk.info or {}
-    except Exception:
-        return {}
+def safe_get_info(tk: yf.Ticker, retries: int = 3) -> dict:
+    for attempt in range(retries):
+        try:
+            info = tk.info
+            if info:
+                return info
+        except Exception:
+            pass
+        if attempt < retries - 1:
+            time.sleep(2 ** attempt * 2)
+    return {}
 
 
 def get_spot_and_name(info: dict, symbol: str) -> tuple[float | None, str]:
@@ -281,6 +287,7 @@ def get_loser_metrics(
         result[ticker_str] = {
             "day_change_pct": round(float(change_pct[ticker]), 2),
             "vol_ratio": round(float(vol_ratio.get(ticker, 1.0)), 2),
+            "last_close": round(float(today_close[ticker]), 2),
         }
 
     print(f"[phase1] {len(result)} tickers down ≥{min_drop}% — scanning options",
@@ -310,6 +317,9 @@ def process_ticker_dip(
         info = safe_get_info(tk)
         spot, name = get_spot_and_name(info, symbol)
         if not spot:
+            spot = dip_info.get("last_close")
+            name = symbol
+        if not spot:
             meta["error"] = "no spot price"
             rejected.append({"ticker": symbol, "reason": "Stale data — no spot"})
             return accepted, rejected, meta
@@ -324,12 +334,18 @@ def process_ticker_dip(
         next_earnings = get_next_earnings_date(tk)
         meta["next_earnings"] = next_earnings.isoformat() if next_earnings else None
 
-        try:
-            expirations = tk.options or ()
-        except Exception as e:
-            meta["error"] = f"options list error: {e}"
-            rejected.append({"ticker": symbol, "reason": f"Options unavailable: {e}"})
-            return accepted, rejected, meta
+        expirations = ()
+        for attempt in range(3):
+            try:
+                expirations = tk.options or ()
+                if expirations:
+                    break
+            except Exception as e:
+                if attempt == 2:
+                    meta["error"] = f"options list error: {e}"
+                    rejected.append({"ticker": symbol, "reason": f"Options unavailable: {e}"})
+                    return accepted, rejected, meta
+                time.sleep(2 ** attempt * 2)
 
         today = date.today()
         max_exp = today + timedelta(days=CONFIG["max_dte"])
@@ -534,11 +550,16 @@ def main() -> int:
     losers_list = sorted(loser_metrics.items(), key=lambda x: x[1]["day_change_pct"])
 
     # Phase 2: full CSP scan on the losers.
+    # Run sequentially — Yahoo rate limits are exhausted after Phase 1 + the
+    # preceding S&P 500 scan, so hammering with 8 threads just fails.
+    print("[phase2] cooling down 10s before option chain scans…", flush=True)
+    time.sleep(10)
+
     all_accepted: list[dict] = []
     all_rejected: list[dict] = []
     ticker_meta: list[dict] = []
 
-    with ThreadPoolExecutor(max_workers=CONFIG["max_workers"]) as pool:
+    with ThreadPoolExecutor(max_workers=2) as pool:
         futures = {pool.submit(process_ticker_dip, sym, metrics): sym
                    for sym, metrics in loser_metrics.items()}
         n = len(futures)
