@@ -96,6 +96,8 @@
     <button data-tab="cushion"    class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Best Cushion</button>
     <button data-tab="liquidity"  class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Best Liquidity</button>
     <button data-tab="earnsafe"   class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Earnings-Safe</button>
+    <button data-tab="richvol"    class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">🔥 IV Rich</button>
+    <button data-tab="value"      class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">💎 Value Picks</button>
     <button data-tab="rejected"   class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Rejected / Landmines</button>
   </div>
 </section>
@@ -225,8 +227,10 @@
 </section>
 
 <footer class="max-w-screen-2xl mx-auto px-6 pb-8 text-xs text-slate-400">
-  Data via Yahoo Finance (yfinance). Delta computed via Black-Scholes
-  (yfinance does not return greeks). Not investment advice — verify in your broker before trading.
+  Data via Yahoo Finance (yfinance). Delta and PoP computed via Black-Scholes. IV Rank derived from 252-day
+  realized-vol range (HV20). Fair Value = average of Graham Number (√(22.5 × EPS × BV/share)) and
+  P/E fair value (EPS × 15); N/A for ETFs or companies with negative EPS / book value.
+  Margin of Safety = (FMV − Price) / FMV. Not investment advice — verify in your broker before trading.
 </footer>
 
 <script src="app.js"></script>

@@ -40,6 +40,10 @@
       render: (r) => `<span class="text-slate-600 text-xs">${escapeHTML(truncate(r.company_name, 24))}</span>` },
     { key: "current_price", label: "Price", type: "number", align: "right",
       render: (r) => fmtMoney(r.current_price) },
+    { key: "fmv", label: "Fair Value", type: "number", align: "right",
+      render: (r) => fmvCell(r) },
+    { key: "margin_of_safety_pct", label: "MoS%", type: "number", align: "right",
+      render: (r) => mosCell(r.margin_of_safety_pct) },
     { key: "strike", label: "Target", type: "number", align: "right",
       render: (r) => `<span class="font-medium">${fmtMoney(r.strike)}</span>` },
     { key: "premium_dollars", label: "Prem $", type: "number", align: "right",
@@ -57,8 +61,14 @@
       render: (r) => `<span class="text-xs text-slate-500">${r.premium_used}</span>` },
     { key: "delta_pct", label: "Delta", type: "number", align: "right",
       render: (r) => deltaCell(r.delta_pct) },
+    { key: "pop_pct", label: "PoP%", type: "number", align: "right",
+      render: (r) => popCell(r.pop_pct) },
     { key: "iv_pct", label: "IV", type: "number", align: "right",
       render: (r) => `${r.iv_pct.toFixed(1)}%` },
+    { key: "iv_rank_pct", label: "IV Rank", type: "number", align: "right",
+      render: (r) => ivRankCell(r.iv_rank_pct) },
+    { key: "iv_premium_pct", label: "IV Prem%", type: "number", align: "right",
+      render: (r) => ivPremCell(r.iv_premium_pct) },
     { key: "open_interest", label: "OI", type: "number", align: "right",
       render: (r) => fmtInt(r.open_interest) },
     { key: "volume", label: "Vol", type: "number", align: "right",
@@ -119,6 +129,10 @@
     liquidity: { sort: { key: "open_interest", dir: "desc" }, filter: () => true },
     earnsafe:  { sort: { key: "score", dir: "desc" },
                  filter: (r) => !r.earnings_risk && (r.days_until_earnings == null || r.days_until_earnings > r.dte + 7) },
+    richvol:   { sort: { key: "iv_rank_pct", dir: "desc" },
+                 filter: (r) => r.iv_rank_pct != null && r.iv_rank_pct >= 50 },
+    value:     { sort: { key: "margin_of_safety_pct", dir: "desc" },
+                 filter: (r) => r.fmv != null && r.margin_of_safety_pct != null && r.margin_of_safety_pct > 0 },
     rejected:  { sort: { key: "ticker", dir: "asc" }, filter: () => true, isRejected: true },
   };
 
@@ -146,6 +160,44 @@
     if (v >= 10) cls = "text-amber-700 bg-amber-50";
     if (v >= 13) cls = "text-rose-700 bg-rose-50";
     return `<span class="pill ${cls}">${v.toFixed(1)}%</span>`;
+  }
+  function popCell(v) {
+    if (v == null || isNaN(v)) return '<span class="text-slate-400">—</span>';
+    let cls = "text-emerald-700 font-medium";
+    if (v < 80) cls = "text-amber-700";
+    if (v < 70) cls = "text-rose-700";
+    return `<span class="${cls}">${v.toFixed(1)}%</span>`;
+  }
+  function ivRankCell(v) {
+    if (v == null || isNaN(v)) return '<span class="text-slate-400">—</span>';
+    let cls = "text-slate-600 bg-slate-50";
+    if (v >= 50) cls = "text-emerald-700 bg-emerald-50";
+    if (v >= 75) cls = "text-emerald-800 bg-emerald-100";
+    if (v < 25) cls = "text-rose-600 bg-rose-50";
+    return `<span class="pill ${cls}">${v.toFixed(0)}</span>`;
+  }
+  function ivPremCell(v) {
+    if (v == null || isNaN(v)) return '<span class="text-slate-400">—</span>';
+    const sign = v >= 0 ? "+" : "";
+    const cls = v >= 20 ? "text-emerald-700 font-medium"
+              : v >= 0  ? "text-slate-700"
+              : "text-rose-600";
+    return `<span class="${cls}">${sign}${v.toFixed(0)}%</span>`;
+  }
+  function fmvCell(r) {
+    if (r.fmv == null) return '<span class="text-slate-400 text-xs">N/A</span>';
+    const parts = [];
+    if (r.fmv_graham != null) parts.push(`G: ${fmtMoney(r.fmv_graham)}`);
+    if (r.fmv_pe != null) parts.push(`P/E: ${fmtMoney(r.fmv_pe)}`);
+    const tip = parts.join(" | ");
+    return `<span class="font-mono text-xs" title="${tip}">${fmtMoney(r.fmv)}</span>`;
+  }
+  function mosCell(v) {
+    if (v == null || isNaN(v)) return '<span class="text-slate-400 text-xs">—</span>';
+    if (v >= 20) return `<span class="text-emerald-700 font-semibold">${v.toFixed(1)}%</span>`;
+    if (v >= 5)  return `<span class="text-emerald-600">${v.toFixed(1)}%</span>`;
+    if (v >= 0)  return `<span class="text-slate-500">${v.toFixed(1)}%</span>`;
+    return `<span class="text-rose-600">${v.toFixed(1)}%</span>`;
   }
   function spreadCell(v) {
     let cls = "text-emerald-700";

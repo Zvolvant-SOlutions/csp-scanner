@@ -24,6 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+import numpy as np
 import yfinance as yf
 from scipy.stats import norm
 
@@ -70,19 +71,125 @@ def _safe_int(v) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Black-Scholes put delta.
+# Black-Scholes helpers.
 # ---------------------------------------------------------------------------
-def bs_put_delta(spot: float, strike: float, t_years: float,
-                 r: float, sigma: float) -> float | None:
-    """Black-Scholes put delta. Returns a negative value in (-1, 0)."""
+def _bs_d1_d2(spot: float, strike: float, t_years: float,
+              r: float, sigma: float) -> tuple[float, float] | None:
     if t_years <= 0 or sigma <= 0 or spot <= 0 or strike <= 0:
         return None
     try:
         d1 = (math.log(spot / strike) + (r + 0.5 * sigma ** 2) * t_years) \
             / (sigma * math.sqrt(t_years))
-        return float(norm.cdf(d1) - 1.0)
+        d2 = d1 - sigma * math.sqrt(t_years)
+        return d1, d2
     except (ValueError, ZeroDivisionError):
         return None
+
+
+def bs_put_delta(spot: float, strike: float, t_years: float,
+                 r: float, sigma: float) -> float | None:
+    """Black-Scholes put delta. Returns a negative value in (-1, 0)."""
+    res = _bs_d1_d2(spot, strike, t_years, r, sigma)
+    if res is None:
+        return None
+    d1, _ = res
+    return float(norm.cdf(d1) - 1.0)
+
+
+def bs_pop(spot: float, strike: float, t_years: float,
+           r: float, sigma: float) -> float | None:
+    """Probability the put expires OTM (stock stays above strike) = N(d2), as %."""
+    res = _bs_d1_d2(spot, strike, t_years, r, sigma)
+    if res is None:
+        return None
+    _, d2 = res
+    return round(float(norm.cdf(d2)) * 100.0, 1)
+
+
+# ---------------------------------------------------------------------------
+# Historical volatility + IV rank.
+# ---------------------------------------------------------------------------
+def compute_historical_vol(tk: yf.Ticker) -> dict:
+    """
+    Fetch 1 year of daily closes, compute 20-day and 60-day realized vol
+    (annualized), and return the 252-day range of HV20 so callers can derive
+    a crude IV rank at the contract level.
+    """
+    out = {"hv20_pct": None, "hv60_pct": None,
+           "rv_min_pct": None, "rv_max_pct": None}
+    try:
+        hist = tk.history(period="1y", interval="1d",
+                          auto_adjust=True, progress=False)
+        if hist is None or len(hist) < 30:
+            return out
+        closes = hist["Close"].dropna()
+        if len(closes) < 30:
+            return out
+        log_ret = np.log(closes / closes.shift(1)).dropna()
+        rv20 = log_ret.rolling(20).std() * math.sqrt(252) * 100.0
+        rv60 = log_ret.rolling(60).std() * math.sqrt(252) * 100.0
+        rv20_clean = rv20.dropna()
+        rv60_clean = rv60.dropna()
+        if len(rv20_clean) > 0:
+            out["hv20_pct"] = round(float(rv20_clean.iloc[-1]), 1)
+            out["rv_min_pct"] = round(float(rv20_clean.min()), 1)
+            out["rv_max_pct"] = round(float(rv20_clean.max()), 1)
+        if len(rv60_clean) > 0:
+            out["hv60_pct"] = round(float(rv60_clean.iloc[-1]), 1)
+    except Exception:
+        pass
+    return out
+
+
+def iv_rank_from_rv(iv_pct: float, rv_min: float | None, rv_max: float | None) -> float | None:
+    """IV rank: where current IV sits in the 1-year realized-vol range (0-100)."""
+    if rv_min is None or rv_max is None or rv_max <= rv_min:
+        return None
+    return round(max(0.0, min(100.0, (iv_pct - rv_min) / (rv_max - rv_min) * 100.0)), 1)
+
+
+def iv_premium_pct(iv_pct: float, hv20: float | None) -> float | None:
+    """How much IV exceeds 20-day realized vol, as a percent of HV20."""
+    if not hv20 or hv20 <= 0:
+        return None
+    return round((iv_pct / hv20 - 1.0) * 100.0, 1)
+
+
+# ---------------------------------------------------------------------------
+# Fair market value (fundamental).
+# ---------------------------------------------------------------------------
+def compute_fair_value(info: dict, spot: float) -> dict:
+    """
+    Returns two FMV estimates and the average:
+      - Graham Number: sqrt(22.5 × EPS × BV/share)  — requires positive EPS + BV
+      - P/E fair value: forward (or trailing) EPS × 15  — conservative long-run P/E
+    Returns None values for ETFs / companies with negative/missing fundamentals.
+    """
+    out = {"fmv": None, "fmv_graham": None, "fmv_pe": None,
+           "margin_of_safety_pct": None}
+    estimates: list[float] = []
+
+    eps = info.get("trailingEps")
+    bv = info.get("bookValue")
+    if eps and bv and eps > 0 and bv > 0:
+        graham = math.sqrt(22.5 * eps * bv)
+        out["fmv_graham"] = round(graham, 2)
+        estimates.append(graham)
+
+    # Use forward EPS if available, else trailing.
+    fwd_eps = info.get("forwardEps")
+    use_eps = fwd_eps if (fwd_eps and fwd_eps > 0) else eps
+    if use_eps and use_eps > 0:
+        pe_fv = use_eps * 15.0
+        out["fmv_pe"] = round(pe_fv, 2)
+        estimates.append(pe_fv)
+
+    if estimates and spot and spot > 0:
+        fmv = sum(estimates) / len(estimates)
+        out["fmv"] = round(fmv, 2)
+        out["margin_of_safety_pct"] = round((fmv - spot) / fmv * 100.0, 1)
+
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -218,6 +325,9 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
         next_earnings = get_next_earnings_date(tk)
         meta["next_earnings"] = next_earnings.isoformat() if next_earnings else None
 
+        hv_data = compute_historical_vol(tk)
+        fv_data = compute_fair_value(info, spot)
+
         try:
             expirations = tk.options or ()
         except Exception as e:
@@ -333,10 +443,22 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
                 annualized_premium_pct = (premium / strike) \
                     * (365.0 / dte) * 100.0
 
+                iv_pct_val = iv * 100.0
+                pop = bs_pop(spot, strike, t_years, CONFIG["risk_free_rate"], iv)
+                iv_rnk = iv_rank_from_rv(iv_pct_val,
+                                         hv_data["rv_min_pct"],
+                                         hv_data["rv_max_pct"])
+                iv_prem = iv_premium_pct(iv_pct_val, hv_data["hv20_pct"])
+
                 contract = {
                     "ticker": symbol,
                     "company_name": name,
                     "current_price": round(spot, 2),
+                    # Fair value fields (ticker-level, same for all contracts)
+                    "fmv": fv_data["fmv"],
+                    "fmv_graham": fv_data["fmv_graham"],
+                    "fmv_pe": fv_data["fmv_pe"],
+                    "margin_of_safety_pct": fv_data["margin_of_safety_pct"],
                     "expiration": exp_str,
                     "dte": dte,
                     "strike": round(strike, 2),
@@ -346,7 +468,12 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
                     "premium_used": CONFIG["premium_basis"],
                     "premium": round(premium, 2),
                     "delta_pct": round(delta_abs * 100.0, 2),
-                    "iv_pct": round(iv * 100.0, 2),
+                    "pop_pct": pop,
+                    "iv_pct": round(iv_pct_val, 2),
+                    "iv_rank_pct": iv_rnk,
+                    "iv_premium_pct": iv_prem,
+                    "hv20_pct": hv_data["hv20_pct"],
+                    "hv60_pct": hv_data["hv60_pct"],
                     "open_interest": oi,
                     "volume": volume,
                     "spread_pct": round(spread_pct, 2),
