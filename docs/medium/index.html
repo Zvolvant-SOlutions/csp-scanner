@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CSP Scanner (S&P 500) — Cash-Secured Put Opportunities</title>
+<title>CSP Scanner — 60-90 DTE</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -36,12 +36,22 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
 
+<!-- Page config — sets defaults for 60-90 DTE plays -->
+<script>
+  window.CSP_PAGE_CONFIG = {
+    defaultMaxDelta: 25,
+    defaultMinDte: 45,
+    defaultMaxDte: 90,
+    defaultExcludeEarnings: false,
+  };
+</script>
+
 <header class="border-b border-slate-200 bg-white">
   <div class="max-w-screen-2xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-3">
     <div>
-      <h1 class="text-xl font-semibold">CSP Scanner — S&amp;P 500</h1>
+      <h1 class="text-xl font-semibold">CSP Scanner — 60-90 DTE</h1>
       <p class="text-xs text-slate-500">
-        All 500 S&amp;P constituents — strict ≤15% delta, ≤21 DTE, earnings-aware
+        Medium-term plays — ≤25% delta, 45-90 DTE, earnings-inclusive
       </p>
     </div>
     <div class="text-right text-xs text-slate-500">
@@ -51,9 +61,9 @@
   </div>
   <nav class="max-w-screen-2xl mx-auto px-6 pb-3 text-sm flex flex-wrap gap-2 items-center">
     <a href="../" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">← Curated universe</a>
-    <span class="px-3 py-1 rounded-full bg-blue-600 text-white font-medium">S&amp;P 500</span>
+    <a href="../sp500/" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">S&amp;P 500 →</a>
     <a href="../dip/" class="px-3 py-1 rounded-full bg-rose-100 text-rose-700 hover:bg-rose-200 transition">🔴 Dip Buys →</a>
-    <a href="../medium/" class="px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition">📅 60-90 DTE →</a>
+    <span class="px-3 py-1 rounded-full bg-violet-600 text-white font-medium">📅 60-90 DTE</span>
     <a href="#how-it-works" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">ⓘ How scoring works</a>
   </nav>
 </header>
@@ -96,7 +106,6 @@
     <button data-tab="ann"        class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Highest Annualized</button>
     <button data-tab="cushion"    class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Best Cushion</button>
     <button data-tab="liquidity"  class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Best Liquidity</button>
-    <button data-tab="earnsafe"   class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Earnings-Safe</button>
     <button data-tab="richvol"    class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">🔥 IV Rich</button>
     <button data-tab="value"      class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">💎 Value Picks</button>
     <button data-tab="rejected"   class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Rejected / Landmines</button>
@@ -120,17 +129,17 @@
       </label>
       <label class="flex flex-col">
         <span class="text-xs text-slate-500 mb-1">Max delta %</span>
-        <input id="f-max-delta" type="number" step="0.5" value="15"
+        <input id="f-max-delta" type="number" step="0.5" value="25"
                class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </label>
       <label class="flex flex-col">
         <span class="text-xs text-slate-500 mb-1">Min DTE</span>
-        <input id="f-min-dte" type="number" step="1" value="1"
+        <input id="f-min-dte" type="number" step="1" value="45"
                class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </label>
       <label class="flex flex-col">
         <span class="text-xs text-slate-500 mb-1">Max DTE</span>
-        <input id="f-max-dte" type="number" step="1" value="21"
+        <input id="f-max-dte" type="number" step="1" value="90"
                class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </label>
       <label class="flex flex-col">
@@ -151,7 +160,7 @@
         </select>
       </label>
       <label class="flex items-end gap-2 pb-1">
-        <input id="f-exclude-earn" type="checkbox" checked class="h-4 w-4" />
+        <input id="f-exclude-earn" type="checkbox" class="h-4 w-4" />
         <span class="text-sm">Exclude earnings before expiry</span>
       </label>
     </div>
@@ -180,21 +189,21 @@
 <!-- How it works -->
 <section id="how-it-works" class="max-w-screen-2xl mx-auto px-6 pb-8">
   <div class="bg-white rounded-lg border border-slate-200 p-6">
-    <h2 class="text-lg font-semibold mb-2">How the score works</h2>
+    <h2 class="text-lg font-semibold mb-2">How the score works — 60-90 DTE</h2>
     <p class="text-sm text-slate-600 mb-4">
-      Every contract is screened through hard filters first, then the survivors
-      are scored <span class="font-semibold">0&ndash;100</span> across five
-      components. Higher score = a better fit for a conservative cash-secured-put
-      strategy.
+      Same scoring model as the short-term scanner, applied to medium-term contracts (45-90 DTE, ≤25% delta).
+      Earnings risk is <em>not</em> excluded by default — at 60-90 DTE most underlyings will have an earnings
+      event within the window, and the premium partly compensates for that risk.
+      Annualized returns will be lower than short-dated plays; use <em>total dollar premium per contract</em>
+      as the primary comparison metric.
     </p>
 
-    <h3 class="text-sm font-semibold text-slate-700 mt-4 mb-2">Hard filters (excluded before scoring)</h3>
+    <h3 class="text-sm font-semibold text-slate-700 mt-4 mb-2">Hard filters</h3>
     <ul class="list-disc list-inside text-sm text-slate-600 space-y-1">
-      <li>Put options only, expiring within 21 calendar days</li>
-      <li>Absolute delta &le; 15%</li>
+      <li>Put options only, 45-90 calendar DTE</li>
+      <li>Absolute delta &le; 25%</li>
       <li>Bid &gt; $0, open interest &ge; 100</li>
       <li>Bid/ask spread &le; 20% of the mid price</li>
-      <li>Earnings before expiration (excluded by default; toggle in filters)</li>
       <li>All of: bid, ask, last price, OI, volume, strike, expiry, IV must be present</li>
     </ul>
 
@@ -212,42 +221,38 @@
           <tr>
             <td class="px-3 py-2 font-medium">Premium efficiency</td>
             <td class="px-3 py-2 text-right num">25</td>
-            <td class="px-3 py-2 text-slate-600">Higher <em>annualized</em> return on the cash you set aside. Computed as <span class="font-mono text-xs">premium &divide; strike &times; 365 &divide; DTE</span>. Roughly 50% annualized earns full points; uses the conservative <em>bid</em> price by default.</td>
+            <td class="px-3 py-2 text-slate-600">Annualized return on capital secured. For 60-90 DTE expect 10-25% annualized; the 50% cap is the same as short-dated but fewer contracts will hit it.</td>
           </tr>
           <tr>
             <td class="px-3 py-2 font-medium">Assignment cushion</td>
             <td class="px-3 py-2 text-right num">25</td>
-            <td class="px-3 py-2 text-slate-600">Bigger discount from today&rsquo;s stock price to the strike. <span class="font-mono text-xs">(price &minus; strike) &divide; price</span>. 15% cushion = full points; smaller cushions scale linearly.</td>
+            <td class="px-3 py-2 text-slate-600">Bigger discount from today&rsquo;s stock price to the strike. 15% cushion = full points.</td>
           </tr>
           <tr>
             <td class="px-3 py-2 font-medium">Delta safety</td>
             <td class="px-3 py-2 text-right num">20</td>
-            <td class="px-3 py-2 text-slate-600">Lower delta (lower assignment probability) earns more. 0% delta &rarr; full 20 pts; the 15% cap &rarr; 0 pts.</td>
+            <td class="px-3 py-2 text-slate-600">Lower delta earns more. Scaled to the 25% cap for this view.</td>
           </tr>
           <tr>
             <td class="px-3 py-2 font-medium">Liquidity</td>
             <td class="px-3 py-2 text-right num">15</td>
-            <td class="px-3 py-2 text-slate-600">Open interest (up to 10 pts, log-scaled: 100 OI = ~5 pts, 10,000 OI = 10 pts) plus tight bid/ask spread (up to 5 pts).</td>
+            <td class="px-3 py-2 text-slate-600">OI (log-scaled) + spread tightness.</td>
           </tr>
           <tr>
             <td class="px-3 py-2 font-medium">Earnings risk</td>
             <td class="px-3 py-2 text-right num">15</td>
-            <td class="px-3 py-2 text-slate-600">No earnings within 30 days &rarr; full 15 pts. Earnings shortly after expiry &rarr; 8 pts. Earnings before expiry &rarr; 0 pts (and usually filtered out entirely). Unknown earnings date &rarr; mild 12-pt penalty.</td>
+            <td class="px-3 py-2 text-slate-600">Earnings before expiry = 0 pts but not filtered out. No earnings in 30 days = 15 pts.</td>
           </tr>
         </tbody>
       </table>
     </div>
-
-    <p class="text-xs text-slate-500 mt-4">
-      Each ticker shows at most its top 3 contracts. The overall rank in column &ldquo;#&rdquo;
-      is the global ordering by score across every accepted contract.
-    </p>
   </div>
 </section>
 
 <footer class="max-w-screen-2xl mx-auto px-6 pb-8 text-xs text-slate-400">
-  Data via Yahoo Finance (yfinance). Delta computed via Black-Scholes
-  (yfinance does not return greeks). Not investment advice — verify in your broker before trading.
+  Data via Yahoo Finance (yfinance). Delta and PoP computed via Black-Scholes. IV Rank derived from 252-day
+  realized-vol range (HV20). Fair Value = average of Graham Number and P/E fair value (EPS &times; 15).
+  Not investment advice — verify in your broker before trading.
 </footer>
 
 <script src="../app.js"></script>

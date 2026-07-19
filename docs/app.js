@@ -8,6 +8,8 @@
 (() => {
   "use strict";
 
+  const PAGE_CONFIG = window.CSP_PAGE_CONFIG || {};
+
   // ----- State -----
   const state = {
     accepted: [],
@@ -17,11 +19,13 @@
     sort: { key: "score", dir: "desc" },
     filters: {
       search: "",
-      maxDelta: 15,
-      maxDte: 21,
+      maxDelta: PAGE_CONFIG.defaultMaxDelta ?? 15,
+      maxDte: PAGE_CONFIG.defaultMaxDte ?? 21,
+      minDte: PAGE_CONFIG.defaultMinDte ?? 1,
       minOi: 100,
       maxSpread: 20,
-      excludeEarnings: true,
+      excludeEarnings: PAGE_CONFIG.defaultExcludeEarnings ?? true,
+      sector: "",
     },
   };
 
@@ -38,6 +42,10 @@
       render: (r) => `<span class="font-mono font-semibold">${r.ticker}</span>` },
     { key: "company_name", label: "Company", type: "string", align: "left",
       render: (r) => `<span class="text-slate-600 text-xs">${escapeHTML(truncate(r.company_name, 24))}</span>` },
+    { key: "sector", label: "Sector", type: "string", align: "left",
+      render: (r) => r.sector
+        ? `<span class="text-xs text-slate-500">${escapeHTML(r.sector)}</span>`
+        : '<span class="text-slate-300 text-xs">—</span>' },
     { key: "current_price", label: "Price", type: "number", align: "right",
       render: (r) => fmtMoney(r.current_price) },
     { key: "fmv", label: "Fair Value", type: "number", align: "right",
@@ -134,6 +142,17 @@
     value:     { sort: { key: "margin_of_safety_pct", dir: "desc" },
                  filter: (r) => r.fmv != null && r.margin_of_safety_pct != null && r.margin_of_safety_pct > 0 },
     rejected:  { sort: { key: "ticker", dir: "asc" }, filter: () => true, isRejected: true },
+    // Sector tabs
+    tech:       { sort: { key: "score", dir: "desc" },
+                  filter: (r) => r.sector === "Technology" || r.sector === "Communication Services" },
+    healthcare: { sort: { key: "score", dir: "desc" },
+                  filter: (r) => r.sector === "Healthcare" },
+    financials: { sort: { key: "score", dir: "desc" },
+                  filter: (r) => r.sector === "Financial Services" },
+    energy:     { sort: { key: "score", dir: "desc" },
+                  filter: (r) => r.sector === "Energy" },
+    consumer:   { sort: { key: "score", dir: "desc" },
+                  filter: (r) => r.sector === "Consumer Cyclical" || r.sector === "Consumer Defensive" },
   };
 
   // ----- Formatters -----
@@ -232,6 +251,20 @@
     </div>`;
   }
 
+  // ----- Sector dropdown -----
+  function populateSectorDropdown() {
+    const sel = document.getElementById("f-sector");
+    if (!sel) return;
+    const sectors = [...new Set(state.accepted.map((r) => r.sector).filter(Boolean))].sort();
+    while (sel.options.length > 1) sel.remove(1);
+    sectors.forEach((s) => {
+      const opt = document.createElement("option");
+      opt.value = s;
+      opt.textContent = s;
+      sel.appendChild(opt);
+    });
+  }
+
   // ----- Data loading -----
   async function loadData() {
     const noCache = `?t=${Date.now()}`;
@@ -257,6 +290,7 @@
           Failed to load data.json. Run <code>python scripts/fetch.py</code> first.
         </td></tr>`;
     }
+    populateSectorDropdown();
     renderSummary();
     render();
   }
@@ -289,9 +323,11 @@
       if (term && !r.ticker.includes(term)) return false;
       if (r.delta_pct != null && r.delta_pct > f.maxDelta) return false;
       if (r.dte != null && r.dte > f.maxDte) return false;
+      if (r.dte != null && r.dte < f.minDte) return false;
       if (r.open_interest != null && r.open_interest < f.minOi) return false;
       if (r.spread_pct != null && r.spread_pct > f.maxSpread) return false;
       if (f.excludeEarnings && r.earnings_risk) return false;
+      if (f.sector && r.sector !== f.sector) return false;
       return true;
     });
   }
@@ -405,18 +441,30 @@
       state.filters.search = document.getElementById("f-search").value || "";
       state.filters.maxDelta = parseFloat(document.getElementById("f-max-delta").value) || 100;
       state.filters.maxDte = parseFloat(document.getElementById("f-max-dte").value) || 365;
+      state.filters.minDte = parseFloat(document.getElementById("f-min-dte").value) || 1;
       state.filters.minOi = parseFloat(document.getElementById("f-min-oi").value) || 0;
       state.filters.maxSpread = parseFloat(document.getElementById("f-max-spread").value) || 100;
       state.filters.excludeEarnings = document.getElementById("f-exclude-earn").checked;
+      state.filters.sector = document.getElementById("f-sector").value || "";
       render();
     };
-    ["f-search", "f-max-delta", "f-max-dte", "f-min-oi", "f-max-spread"]
+    ["f-search", "f-max-delta", "f-max-dte", "f-min-dte", "f-min-oi", "f-max-spread"]
       .forEach((id) => document.getElementById(id).addEventListener("input", onChange));
     document.getElementById("f-exclude-earn").addEventListener("change", onChange);
+    document.getElementById("f-sector").addEventListener("change", onChange);
+  }
+
+  function applyPageConfigToInputs() {
+    const pc = PAGE_CONFIG;
+    if (pc.defaultMaxDelta != null) document.getElementById("f-max-delta").value = pc.defaultMaxDelta;
+    if (pc.defaultMaxDte != null)   document.getElementById("f-max-dte").value   = pc.defaultMaxDte;
+    if (pc.defaultMinDte != null)   document.getElementById("f-min-dte").value   = pc.defaultMinDte;
+    if (pc.defaultExcludeEarnings != null) document.getElementById("f-exclude-earn").checked = pc.defaultExcludeEarnings;
   }
 
   // ----- Init -----
   document.addEventListener("DOMContentLoaded", () => {
+    applyPageConfigToInputs();
     wireTabs();
     wireFilters();
     loadData();

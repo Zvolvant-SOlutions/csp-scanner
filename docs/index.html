@@ -53,6 +53,7 @@
     <span class="px-3 py-1 rounded-full bg-blue-600 text-white font-medium">Curated universe</span>
     <a href="sp500/" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">S&amp;P 500 →</a>
     <a href="dip/" class="px-3 py-1 rounded-full bg-rose-100 text-rose-700 hover:bg-rose-200 transition">🔴 Dip Buys →</a>
+    <a href="medium/" class="px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition">📅 60-90 DTE →</a>
     <a href="#how-it-works" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">ⓘ How scoring works</a>
   </nav>
 </header>
@@ -99,6 +100,12 @@
     <button data-tab="richvol"    class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">🔥 IV Rich</button>
     <button data-tab="value"      class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">💎 Value Picks</button>
     <button data-tab="rejected"   class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">Rejected / Landmines</button>
+    <div class="w-px h-6 bg-slate-200 self-center mx-1"></div>
+    <button data-tab="tech"       class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">💻 Tech</button>
+    <button data-tab="healthcare" class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">🏥 Healthcare</button>
+    <button data-tab="financials" class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">🏦 Financials</button>
+    <button data-tab="energy"     class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">⛽ Energy</button>
+    <button data-tab="consumer"   class="tab-btn px-3 py-2 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900">🛒 Consumer</button>
   </div>
 </section>
 
@@ -117,6 +124,11 @@
                class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </label>
       <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Min DTE</span>
+        <input id="f-min-dte" type="number" step="1" value="1"
+               class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex flex-col">
         <span class="text-xs text-slate-500 mb-1">Max DTE</span>
         <input id="f-max-dte" type="number" step="1" value="21"
                class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -130,6 +142,13 @@
         <span class="text-xs text-slate-500 mb-1">Max spread %</span>
         <input id="f-max-spread" type="number" step="1" value="20"
                class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </label>
+      <label class="flex flex-col">
+        <span class="text-xs text-slate-500 mb-1">Sector</span>
+        <select id="f-sector"
+                class="border border-slate-300 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="">All sectors</option>
+        </select>
       </label>
       <label class="flex items-end gap-2 pb-1">
         <input id="f-exclude-earn" type="checkbox" checked class="h-4 w-4" />

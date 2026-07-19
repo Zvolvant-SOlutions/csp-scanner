@@ -325,6 +325,8 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
         next_earnings = get_next_earnings_date(tk)
         meta["next_earnings"] = next_earnings.isoformat() if next_earnings else None
 
+        sector = info.get("sector", "") or ""
+        industry = info.get("industry", "") or ""
         hv_data = compute_historical_vol(tk)
         fv_data = compute_fair_value(info, spot)
 
@@ -453,6 +455,8 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
                 contract = {
                     "ticker": symbol,
                     "company_name": name,
+                    "sector": sector,
+                    "industry": industry,
                     "current_price": round(spot, 2),
                     # Fair value fields (ticker-level, same for all contracts)
                     "fmv": fv_data["fmv"],
@@ -535,7 +539,24 @@ def main() -> int:
                         help="Directory to write data.json and meta.json into.")
     parser.add_argument("--label", default="",
                         help="Free-text label written into meta.json.")
+    parser.add_argument("--dte-min", type=int, default=None,
+                        help="Min DTE (overrides CONFIG min_dte).")
+    parser.add_argument("--dte-max", type=int, default=None,
+                        help="Max DTE (overrides CONFIG max_dte).")
+    parser.add_argument("--max-delta", type=float, default=None,
+                        help="Max absolute delta 0-1 (overrides CONFIG max_delta).")
+    parser.add_argument("--no-exclude-earnings", action="store_true",
+                        help="Allow contracts where earnings fall before expiry.")
     args = parser.parse_args()
+
+    if args.dte_min is not None:
+        CONFIG["min_dte"] = args.dte_min
+    if args.dte_max is not None:
+        CONFIG["max_dte"] = args.dte_max
+    if args.max_delta is not None:
+        CONFIG["max_delta"] = args.max_delta
+    if args.no_exclude_earnings:
+        CONFIG["exclude_earnings_before_expiry"] = False
 
     data_out = args.out_dir / "data.json"
     meta_out = args.out_dir / "meta.json"
