@@ -206,9 +206,10 @@
   function fmvCell(r) {
     if (r.fmv == null) return '<span class="text-slate-400 text-xs">N/A</span>';
     const parts = [];
-    if (r.fmv_graham != null) parts.push(`G: ${fmtMoney(r.fmv_graham)}`);
+    if (r.fmv_graham != null) parts.push(`Graham: ${fmtMoney(r.fmv_graham)}`);
     if (r.fmv_pe != null) parts.push(`P/E: ${fmtMoney(r.fmv_pe)}`);
-    const tip = parts.join(" | ");
+    if (r.fmv_analyst != null) parts.push(`Analyst: ${fmtMoney(r.fmv_analyst)}`);
+    const tip = parts.join(" | ") || "No breakdown available";
     return `<span class="font-mono text-xs" title="${tip}">${fmtMoney(r.fmv)}</span>`;
   }
   function mosCell(v) {

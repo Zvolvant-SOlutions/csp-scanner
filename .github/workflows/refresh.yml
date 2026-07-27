@@ -83,7 +83,7 @@ jobs:
 
       - name: Fetch options data — 60-90 DTE medium-term
         if: steps.gate.outputs.run == 'true'
-        run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs/medium --dte-min 45 --dte-max 90 --max-delta 0.25 --no-exclude-earnings --label "60-90 DTE"
+        run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs/medium --dte-min 60 --dte-max 90 --max-delta 0.15 --no-exclude-earnings --label "60-90 DTE"
 
       - name: Upload Pages artifact
         if: steps.gate.outputs.run == 'true'

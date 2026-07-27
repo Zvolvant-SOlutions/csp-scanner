@@ -158,14 +158,30 @@ def iv_premium_pct(iv_pct: float, hv20: float | None) -> float | None:
 # ---------------------------------------------------------------------------
 # Fair market value (fundamental).
 # ---------------------------------------------------------------------------
+_SECTOR_PE: dict[str, float] = {
+    "Technology": 25.0,
+    "Communication Services": 22.0,
+    "Consumer Cyclical": 20.0,
+    "Healthcare": 20.0,
+    "Financial Services": 14.0,
+    "Industrials": 18.0,
+    "Basic Materials": 16.0,
+    "Energy": 13.0,
+    "Utilities": 16.0,
+    "Real Estate": 18.0,
+    "Consumer Defensive": 17.0,
+}
+
+
 def compute_fair_value(info: dict, spot: float) -> dict:
     """
-    Returns two FMV estimates and the average:
-      - Graham Number: sqrt(22.5 × EPS × BV/share)  — requires positive EPS + BV
-      - P/E fair value: forward (or trailing) EPS × 15  — conservative long-run P/E
-    Returns None values for ETFs / companies with negative/missing fundamentals.
+    Returns up to three FMV estimates and their average:
+      - Graham Number: sqrt(22.5 × EPS × BV/share)  — value stocks with positive EPS + BV
+      - P/E fair value: forward (or trailing) EPS × sector-appropriate multiple
+      - Analyst target: targetMeanPrice from Yahoo Finance consensus
+    Returns None values for ETFs / companies with missing fundamentals.
     """
-    out = {"fmv": None, "fmv_graham": None, "fmv_pe": None,
+    out = {"fmv": None, "fmv_graham": None, "fmv_pe": None, "fmv_analyst": None,
            "margin_of_safety_pct": None}
     estimates: list[float] = []
 
@@ -176,13 +192,26 @@ def compute_fair_value(info: dict, spot: float) -> dict:
         out["fmv_graham"] = round(graham, 2)
         estimates.append(graham)
 
-    # Use forward EPS if available, else trailing.
+    # Sector-aware P/E multiple instead of flat 15×.
+    sector = info.get("sector", "") or ""
+    pe_multiple = _SECTOR_PE.get(sector, 16.0)
     fwd_eps = info.get("forwardEps")
     use_eps = fwd_eps if (fwd_eps and fwd_eps > 0) else eps
     if use_eps and use_eps > 0:
-        pe_fv = use_eps * 15.0
+        pe_fv = use_eps * pe_multiple
         out["fmv_pe"] = round(pe_fv, 2)
         estimates.append(pe_fv)
+
+    # Analyst consensus price target — most forward-looking signal.
+    analyst_target = info.get("targetMeanPrice") or info.get("targetMedianPrice")
+    if analyst_target:
+        try:
+            at = float(analyst_target)
+            if at > 0:
+                out["fmv_analyst"] = round(at, 2)
+                estimates.append(at)
+        except (TypeError, ValueError):
+            pass
 
     if estimates and spot and spot > 0:
         fmv = sum(estimates) / len(estimates)
@@ -462,6 +491,7 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
                     "fmv": fv_data["fmv"],
                     "fmv_graham": fv_data["fmv_graham"],
                     "fmv_pe": fv_data["fmv_pe"],
+                    "fmv_analyst": fv_data["fmv_analyst"],
                     "margin_of_safety_pct": fv_data["margin_of_safety_pct"],
                     "expiration": exp_str,
                     "dte": dte,

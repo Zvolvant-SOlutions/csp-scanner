@@ -39,8 +39,8 @@
 <!-- Page config — sets defaults for 60-90 DTE plays -->
 <script>
   window.CSP_PAGE_CONFIG = {
-    defaultMaxDelta: 25,
-    defaultMinDte: 45,
+    defaultMaxDelta: 15,
+    defaultMinDte: 60,
     defaultMaxDte: 90,
     defaultExcludeEarnings: false,
   };
@@ -51,7 +51,7 @@
     <div>
       <h1 class="text-xl font-semibold">CSP Scanner — 60-90 DTE</h1>
       <p class="text-xs text-slate-500">
-        Medium-term plays — ≤25% delta, 45-90 DTE, earnings-inclusive
+        Medium-term plays — ≤15% delta, 60-90 DTE, earnings-inclusive
       </p>
     </div>
     <div class="text-right text-xs text-slate-500">
@@ -191,7 +191,7 @@
   <div class="bg-white rounded-lg border border-slate-200 p-6">
     <h2 class="text-lg font-semibold mb-2">How the score works — 60-90 DTE</h2>
     <p class="text-sm text-slate-600 mb-4">
-      Same scoring model as the short-term scanner, applied to medium-term contracts (45-90 DTE, ≤25% delta).
+      Same scoring model as the short-term scanner, applied to medium-term contracts (60-90 DTE, ≤15% delta).
       Earnings risk is <em>not</em> excluded by default — at 60-90 DTE most underlyings will have an earnings
       event within the window, and the premium partly compensates for that risk.
       Annualized returns will be lower than short-dated plays; use <em>total dollar premium per contract</em>
