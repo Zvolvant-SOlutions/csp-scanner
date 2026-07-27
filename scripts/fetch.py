@@ -417,9 +417,6 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
                 if ask <= 0:
                     rejected.append({**base, "reason": "Stale data — no ask"})
                     continue
-                if last <= 0:
-                    rejected.append({**base, "reason": "Stale data — no last"})
-                    continue
                 if iv <= 0:
                     rejected.append({**base, "reason": "Missing IV"})
                     continue

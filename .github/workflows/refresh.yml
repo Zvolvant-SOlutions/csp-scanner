@@ -77,13 +77,13 @@ jobs:
         if: steps.gate.outputs.run == 'true'
         run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs --label "Curated"
 
-      - name: Fetch options data — S&P 500
-        if: steps.gate.outputs.run == 'true'
-        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/sp500 --label "S&P 500"
-
       - name: Fetch options data — 60-90 DTE medium-term
         if: steps.gate.outputs.run == 'true'
         run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs/medium --dte-min 60 --dte-max 90 --max-delta 0.15 --no-exclude-earnings --label "60-90 DTE"
+
+      - name: Fetch options data — S&P 500
+        if: steps.gate.outputs.run == 'true'
+        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/sp500 --label "S&P 500"
 
       - name: Upload Pages artifact
         if: steps.gate.outputs.run == 'true'
