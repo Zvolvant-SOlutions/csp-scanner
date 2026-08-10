@@ -113,10 +113,12 @@ def compute_historical_vol(tk: yf.Ticker) -> dict:
     """
     Fetch 1 year of daily closes, compute 20-day and 60-day realized vol
     (annualized), and return the 252-day range of HV20 so callers can derive
-    a crude IV rank at the contract level.
+    a crude IV rank at the contract level.  Also returns the 3-business-day
+    price change (dollar and percent) using the same history fetch.
     """
     out = {"hv20_pct": None, "hv60_pct": None,
-           "rv_min_pct": None, "rv_max_pct": None}
+           "rv_min_pct": None, "rv_max_pct": None,
+           "price_change_3d": None, "price_change_3d_pct": None}
     try:
         hist = tk.history(period="1y", interval="1d",
                           auto_adjust=True, progress=False)
@@ -125,6 +127,17 @@ def compute_historical_vol(tk: yf.Ticker) -> dict:
         closes = hist["Close"].dropna()
         if len(closes) < 30:
             return out
+
+        # 3-business-day price change: last close vs close 3 trading days prior.
+        if len(closes) >= 4:
+            price_now = float(closes.iloc[-1])
+            price_3d_ago = float(closes.iloc[-4])
+            if price_3d_ago > 0:
+                out["price_change_3d"] = round(price_now - price_3d_ago, 2)
+                out["price_change_3d_pct"] = round(
+                    (price_now - price_3d_ago) / price_3d_ago * 100.0, 2
+                )
+
         log_ret = np.log(closes / closes.shift(1)).dropna()
         rv20 = log_ret.rolling(20).std() * math.sqrt(252) * 100.0
         rv60 = log_ret.rolling(60).std() * math.sqrt(252) * 100.0
@@ -505,6 +518,8 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
                     "iv_premium_pct": iv_prem,
                     "hv20_pct": hv_data["hv20_pct"],
                     "hv60_pct": hv_data["hv60_pct"],
+                    "price_change_3d": hv_data["price_change_3d"],
+                    "price_change_3d_pct": hv_data["price_change_3d_pct"],
                     "open_interest": oi,
                     "volume": volume,
                     "spread_pct": round(spread_pct, 2),

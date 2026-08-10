@@ -48,6 +48,8 @@
         : '<span class="text-slate-300 text-xs">—</span>' },
     { key: "current_price", label: "Price", type: "number", align: "right",
       render: (r) => fmtMoney(r.current_price) },
+    { key: "price_change_3d_pct", label: "3D Chg", type: "number", align: "right",
+      render: (r) => price3dCell(r) },
     { key: "fmv", label: "Fair Value", type: "number", align: "right",
       render: (r) => fmvCell(r) },
     { key: "margin_of_safety_pct", label: "MoS%", type: "number", align: "right",
@@ -174,6 +176,19 @@
     return s.length > n ? s.slice(0, n - 1) + "…" : s;
   }
 
+  function price3dCell(r) {
+    const pct = r.price_change_3d_pct;
+    const chg = r.price_change_3d;
+    if (pct == null || isNaN(pct)) return '<span class="text-slate-400">—</span>';
+    const sign = pct >= 0 ? "+" : "";
+    const arrow = pct >= 0 ? "▲" : "▼";
+    // Red pill = dropped (potential CSP entry); green pill = risen.
+    const cls = pct < 0
+      ? "text-rose-700 bg-rose-50"
+      : "text-emerald-700 bg-emerald-50";
+    const dollarTip = chg != null ? ` (${pct >= 0 ? "+" : ""}$${chg.toFixed(2)})` : "";
+    return `<span class="pill ${cls}" title="3-day: ${sign}${pct.toFixed(2)}%${dollarTip}">${arrow} ${sign}${pct.toFixed(1)}%</span>`;
+  }
   function deltaCell(v) {
     let cls = "text-emerald-700 bg-emerald-50";
     if (v >= 10) cls = "text-amber-700 bg-amber-50";
