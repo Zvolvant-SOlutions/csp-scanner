@@ -1,0 +1,26 @@
+{
+  "last_updated": "2026-09-15T18:15:53.440545+00:00",
+  "label": "+300",
+  "tickers_scanned": 503,
+  "accepted_count": 66,
+  "rejected_count": 16823,
+  "missing_delta_count": 2602,
+  "missing_earnings_count": 0,
+  "tickers_ok": 298,
+  "tickers_failed": 205,
+  "config": {
+    "max_delta": 0.15,
+    "min_delta": 0.1,
+    "min_premium_dollars": 300.0,
+    "max_dte": 90,
+    "min_dte": 30,
+    "min_oi": 100,
+    "max_spread_pct": 20.0,
+    "max_per_ticker": 3,
+    "risk_free_rate": 0.05,
+    "exclude_earnings_before_expiry": false,
+    "premium_basis": "bid",
+    "max_workers": 8
+  },
+  "elapsed_seconds": 48.0
+}

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CSP Scanner — 60-90 DTE</title>
+<title>CSP Scanner — +300 Tickers</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
   tailwind.config = {
@@ -36,11 +36,11 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
 
-<!-- Page config — sets defaults for 60-90 DTE plays -->
+<!-- Page config — sets defaults for +300 premium plays -->
 <script>
   window.CSP_PAGE_CONFIG = {
     defaultMaxDelta: 15,
-    defaultMinDte: 60,
+    defaultMinDte: 30,
     defaultMaxDte: 90,
     defaultExcludeEarnings: false,
   };
@@ -49,9 +49,9 @@
 <header class="border-b border-slate-200 bg-white">
   <div class="max-w-screen-2xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-3">
     <div>
-      <h1 class="text-xl font-semibold">CSP Scanner — 60-90 DTE</h1>
+      <h1 class="text-xl font-semibold">CSP Scanner — +300 Tickers</h1>
       <p class="text-xs text-slate-500">
-        Medium-term plays — ≤15% delta, 60-90 DTE, earnings-inclusive
+        High-premium plays — 10-15% delta, 30-90 DTE, ≥$300 premium/contract
       </p>
     </div>
     <div class="text-right text-xs text-slate-500">
@@ -63,8 +63,8 @@
     <a href="../" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">← Curated universe</a>
     <a href="../sp500/" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">S&amp;P 500 →</a>
     <a href="../dip/" class="px-3 py-1 rounded-full bg-rose-100 text-rose-700 hover:bg-rose-200 transition">🔴 Dip Buys →</a>
-    <span class="px-3 py-1 rounded-full bg-violet-600 text-white font-medium">📅 60-90 DTE</span>
-    <a href="../plus300/" class="px-3 py-1 rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 transition">💰 +300 →</a>
+    <a href="../medium/" class="px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition">📅 60-90 DTE →</a>
+    <span class="px-3 py-1 rounded-full bg-amber-600 text-white font-medium">💰 +300</span>
     <a href="#how-it-works" class="px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition">ⓘ How scoring works</a>
   </nav>
 </header>
@@ -190,19 +190,20 @@
 <!-- How it works -->
 <section id="how-it-works" class="max-w-screen-2xl mx-auto px-6 pb-8">
   <div class="bg-white rounded-lg border border-slate-200 p-6">
-    <h2 class="text-lg font-semibold mb-2">How the score works — 60-90 DTE</h2>
+    <h2 class="text-lg font-semibold mb-2">How the score works — +300 Tickers</h2>
     <p class="text-sm text-slate-600 mb-4">
-      Same scoring model as the short-term scanner, applied to medium-term contracts (60-90 DTE, ≤15% delta).
-      Earnings risk is <em>not</em> excluded by default — at 60-90 DTE most underlyings will have an earnings
-      event within the window, and the premium partly compensates for that risk.
-      Annualized returns will be lower than short-dated plays; use <em>total dollar premium per contract</em>
-      as the primary comparison metric.
+      Same scoring model as the other scanners, filtered to <em>high-premium</em> plays: absolute delta
+      between 10% and 15%, 30-90 calendar DTE, and at least <strong>$300 of premium per contract</strong>
+      (bid &times; 100). Earnings risk is <em>not</em> excluded by default — most underlyings will have an
+      earnings event within a 30-90 day window, and the premium partly compensates for that risk.
+      Use <em>total dollar premium per contract</em> as the primary comparison metric.
     </p>
 
     <h3 class="text-sm font-semibold text-slate-700 mt-4 mb-2">Hard filters</h3>
     <ul class="list-disc list-inside text-sm text-slate-600 space-y-1">
-      <li>Put options only, 45-90 calendar DTE</li>
-      <li>Absolute delta &le; 25%</li>
+      <li>Put options only, 30-90 calendar DTE</li>
+      <li>Absolute delta between 10% and 15%</li>
+      <li>Premium (bid &times; 100) &ge; $300 per contract</li>
       <li>Bid &gt; $0, open interest &ge; 100</li>
       <li>Bid/ask spread &le; 20% of the mid price</li>
       <li>All of: bid, ask, last price, OI, volume, strike, expiry, IV must be present</li>

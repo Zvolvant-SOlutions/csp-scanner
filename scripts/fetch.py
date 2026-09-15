@@ -33,6 +33,8 @@ from scipy.stats import norm
 # ---------------------------------------------------------------------------
 CONFIG = {
     "max_delta": 0.15,          # absolute delta cutoff
+    "min_delta": 0.0,           # absolute delta floor (0 = no floor)
+    "min_premium_dollars": 0.0, # min premium per contract in $ (0 = no floor)
     "max_dte": 21,              # max calendar days to expiration
     "min_dte": 1,               # ignore same-day expirations
     "min_oi": 100,              # minimum open interest
@@ -459,7 +461,13 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
                 if delta_abs > CONFIG["max_delta"]:
                     rejected.append({
                         **base,
-                        "reason": f"Delta above 15% ({delta_abs * 100:.1f}%)",
+                        "reason": f"Delta above {CONFIG['max_delta'] * 100:.0f}% ({delta_abs * 100:.1f}%)",
+                    })
+                    continue
+                if delta_abs < CONFIG["min_delta"]:
+                    rejected.append({
+                        **base,
+                        "reason": f"Delta below {CONFIG['min_delta'] * 100:.0f}% ({delta_abs * 100:.1f}%)",
                     })
                     continue
 
@@ -477,6 +485,14 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
 
                 # Metrics.
                 premium = bid if CONFIG["premium_basis"] == "bid" else mid
+                premium_dollars = premium * 100.0  # one contract = 100 shares
+                if premium_dollars < CONFIG["min_premium_dollars"]:
+                    rejected.append({
+                        **base,
+                        "reason": f"Premium below ${CONFIG['min_premium_dollars']:.0f} "
+                                  f"(${premium_dollars:.0f})",
+                    })
+                    continue
                 cash_required = strike * 100.0  # one contract = 100 shares
                 breakeven = strike - premium
                 assignment_discount_pct = ((spot - strike) / spot) * 100.0
@@ -511,6 +527,7 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
                     "mid": round(mid, 2),
                     "premium_used": CONFIG["premium_basis"],
                     "premium": round(premium, 2),
+                    "premium_dollars": round(premium_dollars, 2),
                     "delta_pct": round(delta_abs * 100.0, 2),
                     "pop_pct": pop,
                     "iv_pct": round(iv_pct_val, 2),
@@ -587,6 +604,10 @@ def main() -> int:
                         help="Max DTE (overrides CONFIG max_dte).")
     parser.add_argument("--max-delta", type=float, default=None,
                         help="Max absolute delta 0-1 (overrides CONFIG max_delta).")
+    parser.add_argument("--min-delta", type=float, default=None,
+                        help="Min absolute delta 0-1 (overrides CONFIG min_delta).")
+    parser.add_argument("--min-premium", type=float, default=None,
+                        help="Min premium per contract in dollars (overrides CONFIG min_premium_dollars).")
     parser.add_argument("--no-exclude-earnings", action="store_true",
                         help="Allow contracts where earnings fall before expiry.")
     args = parser.parse_args()
@@ -597,6 +618,10 @@ def main() -> int:
         CONFIG["max_dte"] = args.dte_max
     if args.max_delta is not None:
         CONFIG["max_delta"] = args.max_delta
+    if args.min_delta is not None:
+        CONFIG["min_delta"] = args.min_delta
+    if args.min_premium is not None:
+        CONFIG["min_premium_dollars"] = args.min_premium
     if args.no_exclude_earnings:
         CONFIG["exclude_earnings_before_expiry"] = False
 
