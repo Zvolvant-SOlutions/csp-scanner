@@ -1,13 +1,13 @@
 {
-  "last_updated": "2026-09-15T18:15:53.440545+00:00",
+  "last_updated": "2026-09-15T18:21:27.788273+00:00",
   "label": "+300",
-  "tickers_scanned": 503,
+  "tickers_scanned": 94,
   "accepted_count": 66,
-  "rejected_count": 16823,
-  "missing_delta_count": 2602,
-  "missing_earnings_count": 0,
-  "tickers_ok": 298,
-  "tickers_failed": 205,
+  "rejected_count": 12246,
+  "missing_delta_count": 3097,
+  "missing_earnings_count": 3,
+  "tickers_ok": 93,
+  "tickers_failed": 1,
   "config": {
     "max_delta": 0.15,
     "min_delta": 0.1,
@@ -22,5 +22,5 @@
     "premium_basis": "bid",
     "max_workers": 8
   },
-  "elapsed_seconds": 48.0
+  "elapsed_seconds": 16.3
 }
