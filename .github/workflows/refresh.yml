@@ -69,27 +69,12 @@ jobs:
         if: steps.gate.outputs.run == 'true'
         run: pip install -r requirements.txt
 
-      # Heavy S&P scans run FIRST, each with a clean rate-limit window: the
-      # regular S&P scan hits Yahoo's limiter fresh, then a cooldown lets it
-      # recover before the +300 S&P scan. Running these after the lighter
-      # 94-ticker scans (or the dip ranking, which prices all 503) starves
-      # whichever 503 scan lacks a clean window.
-      - name: Fetch options data — S&P 500
-        if: steps.gate.outputs.run == 'true'
-        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/sp500 --max-workers 4 --label "S&P 500"
-
-      - name: Cooldown between heavy S&P scans
-        if: steps.gate.outputs.run == 'true'
-        run: sleep 240
-
-      - name: Fetch options data — +300 S&P 500 (10-15% delta, 30-90 DTE, ≥$300/contract)
-        if: steps.gate.outputs.run == 'true'
-        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/plus300sp500 --min-delta 0.10 --max-delta 0.15 --dte-min 30 --dte-max 90 --min-premium 300 --no-exclude-earnings --max-workers 4 --label "+300 S&P 500"
-
-      - name: Cooldown before lighter scans
-        if: steps.gate.outputs.run == 'true'
-        run: sleep 120
-
+      # Scan order matters: Yahoo throttles yfinance per-IP as a run proceeds,
+      # so whatever runs late starves. Put the primary 94-ticker tabs FIRST
+      # (they hit a fresh limiter and populate reliably), then the two heavy
+      # 503-ticker S&P scans LAST — the regular S&P scan, a cooldown so the
+      # limiter recovers, then the +300 S&P scan. The S&P tabs may vary in
+      # coverage run-to-run; the curated/medium/+300/dip tabs stay reliable.
       - name: Fetch options data — curated universe
         if: steps.gate.outputs.run == 'true'
         run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs --label "Curated"
@@ -105,6 +90,18 @@ jobs:
       - name: Fetch options data — Dip Buys (top 20 daily losers)
         if: steps.gate.outputs.run == 'true'
         run: python scripts/fetch_dip.py --sp500-tickers config/tickers_sp500.txt --out-dir docs/dip --label "Dip Buys"
+
+      - name: Fetch options data — S&P 500
+        if: steps.gate.outputs.run == 'true'
+        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/sp500 --max-workers 4 --label "S&P 500"
+
+      - name: Cooldown between heavy S&P scans
+        if: steps.gate.outputs.run == 'true'
+        run: sleep 240
+
+      - name: Fetch options data — +300 S&P 500 (10-15% delta, 30-90 DTE, ≥$300/contract)
+        if: steps.gate.outputs.run == 'true'
+        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/plus300sp500 --min-delta 0.10 --max-delta 0.15 --dte-min 30 --dte-max 90 --min-premium 300 --no-exclude-earnings --max-workers 4 --label "+300 S&P 500"
 
       - name: Upload Pages artifact
         if: steps.gate.outputs.run == 'true'
