@@ -6,6 +6,12 @@ name: Refresh CSP data and deploy to Pages
 # `gh workflow run refresh.yml`. We rely on launchd instead of GHA `schedule:`
 # because GitHub Actions does not guarantee schedule timing — 5–30 min delays
 # at the top of the hour are common and runs are sometimes dropped entirely.
+#
+# Architecture: the scans are split across parallel jobs so each runs on its
+# own runner (its own IP). Yahoo throttles yfinance per-IP, so running two
+# full 503-ticker S&P scans in one job starved one of them. Giving each heavy
+# S&P scan a dedicated runner removes the shared rate-limit entirely. The
+# `assemble` job merges every job's data into docs/ and deploys once.
 on:
   workflow_dispatch: {}
   push:
@@ -27,11 +33,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  # ── Eastern-time gate ──────────────────────────────────────────────────────
+  gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
     outputs:
-      should_run: ${{ steps.gate.outputs.run }}
+      run: ${{ steps.gate.outputs.run }}
     steps:
       - name: Eastern-time gate (skip cron firings that aren't 10 AM / 2 PM ET)
         id: gate
@@ -56,62 +62,115 @@ jobs:
             echo "::notice::Skipping — current Eastern hour is $HOUR (need 10 or 14)."
           fi
 
+  # ── Primary 94-ticker tabs + dip (one runner) ──────────────────────────────
+  build_main:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
       - uses: actions/checkout@v4
-        if: steps.gate.outputs.run == 'true'
-
       - uses: actions/setup-python@v5
-        if: steps.gate.outputs.run == 'true'
         with:
           python-version: "3.11"
           cache: pip
-
       - name: Install deps
-        if: steps.gate.outputs.run == 'true'
         run: pip install -r requirements.txt
-
-      # Scan order matters: Yahoo throttles yfinance per-IP as a run proceeds,
-      # so whatever runs late starves. Put the primary 94-ticker tabs FIRST
-      # (they hit a fresh limiter and populate reliably), then the two heavy
-      # 503-ticker S&P scans LAST — the regular S&P scan, a cooldown so the
-      # limiter recovers, then the +300 S&P scan. The S&P tabs may vary in
-      # coverage run-to-run; the curated/medium/+300/dip tabs stay reliable.
       - name: Fetch options data — curated universe
-        if: steps.gate.outputs.run == 'true'
         run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs --label "Curated"
-
       - name: Fetch options data — 60-90 DTE medium-term
-        if: steps.gate.outputs.run == 'true'
         run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs/medium --dte-min 60 --dte-max 90 --max-delta 0.15 --no-exclude-earnings --label "60-90 DTE"
-
       - name: Fetch options data — +300 premium (10-15% delta, 30-90 DTE, ≥$300/contract)
-        if: steps.gate.outputs.run == 'true'
         run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs/plus300 --min-delta 0.10 --max-delta 0.15 --dte-min 30 --dte-max 90 --min-premium 300 --no-exclude-earnings --label "+300"
-
       - name: Fetch options data — Dip Buys (top 20 daily losers)
-        if: steps.gate.outputs.run == 'true'
         run: python scripts/fetch_dip.py --sp500-tickers config/tickers_sp500.txt --out-dir docs/dip --label "Dip Buys"
+      - name: Upload site (page shells + primary-tab data)
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-main
+          path: docs
+          retention-days: 1
 
+  # ── Full S&P 500 scan (dedicated runner / IP) ──────────────────────────────
+  build_sp500:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install deps
+        run: pip install -r requirements.txt
       - name: Fetch options data — S&P 500
-        if: steps.gate.outputs.run == 'true'
-        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/sp500 --max-workers 4 --label "S&P 500"
+        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir out/sp500 --max-workers 4 --label "S&P 500"
+      - name: Upload S&P 500 data
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-sp500
+          path: out/sp500
+          retention-days: 1
 
-      - name: Cooldown between heavy S&P scans
-        if: steps.gate.outputs.run == 'true'
-        run: sleep 240
-
+  # ── Full S&P 500 +300 scan (dedicated runner / IP) ─────────────────────────
+  build_plus300sp500:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install deps
+        run: pip install -r requirements.txt
       - name: Fetch options data — +300 S&P 500 (10-15% delta, 30-90 DTE, ≥$300/contract)
-        if: steps.gate.outputs.run == 'true'
-        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/plus300sp500 --min-delta 0.10 --max-delta 0.15 --dte-min 30 --dte-max 90 --min-premium 300 --no-exclude-earnings --max-workers 4 --label "+300 S&P 500"
+        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir out/plus300sp500 --min-delta 0.10 --max-delta 0.15 --dte-min 30 --dte-max 90 --min-premium 300 --no-exclude-earnings --max-workers 4 --label "+300 S&P 500"
+      - name: Upload +300 S&P data
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-plus300sp500
+          path: out/plus300sp500
+          retention-days: 1
 
+  # ── Merge every job's data into docs/ and publish the Pages artifact ───────
+  assemble:
+    needs: [gate, build_main, build_sp500, build_plus300sp500]
+    # Deploy as long as the gate says run and the primary tabs built. The heavy
+    # S&P jobs are best-effort: if one fails, its download is skipped and the
+    # previously committed data for that tab stays in place.
+    if: ${{ always() && needs.gate.outputs.run == 'true' && needs.build_main.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download site (page shells + primary-tab data)
+        uses: actions/download-artifact@v4
+        with:
+          name: site-main
+          path: docs
+      - name: Download S&P 500 data
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: site-sp500
+          path: docs/sp500
+      - name: Download +300 S&P data
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: site-plus300sp500
+          path: docs/plus300sp500
       - name: Upload Pages artifact
-        if: steps.gate.outputs.run == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
 
   deploy:
-    needs: build
-    if: needs.build.outputs.should_run == 'true'
+    needs: assemble
+    if: needs.assemble.result == 'success'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
