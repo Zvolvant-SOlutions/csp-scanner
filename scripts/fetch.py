@@ -25,6 +25,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import yfinance as yf
 from scipy.stats import norm
 
@@ -111,23 +112,66 @@ def bs_pop(spot: float, strike: float, t_years: float,
 # ---------------------------------------------------------------------------
 # Historical volatility + IV rank.
 # ---------------------------------------------------------------------------
-def compute_historical_vol(tk: yf.Ticker) -> dict:
+# Cache of 1-year daily close Series keyed by ticker, filled by
+# prefetch_history() before the per-ticker scan begins.
+_HISTORY_CACHE: dict = {}
+
+
+def prefetch_history(symbols: list, chunk_size: int = 100) -> None:
     """
-    Fetch 1 year of daily closes, compute 20-day and 60-day realized vol
-    (annualized), and return the 252-day range of HV20 so callers can derive
-    a crude IV rank at the contract level.  Also returns the 3-business-day
-    price change (dollar and percent) using the same history fetch.
+    Batch-download 1y daily closes for all symbols in a handful of requests.
+
+    One batched yf.download() is far more rate-limit-friendly than hundreds of
+    concurrent per-ticker tk.history() calls, which Yahoo throttles — that
+    throttling is why HV / 200-DMA / 3-day-change columns come back blank on
+    large scans. compute_historical_vol() reads this cache first and only falls
+    back to a per-ticker fetch when a symbol is missing.
+    """
+    for i in range(0, len(symbols), chunk_size):
+        chunk = symbols[i:i + chunk_size]
+        try:
+            data = yf.download(chunk, period="1y", interval="1d",
+                               auto_adjust=True, group_by="ticker",
+                               threads=True, progress=False)
+        except Exception:
+            continue
+        if data is None or getattr(data, "empty", True):
+            continue
+        for sym in chunk:
+            try:
+                if len(chunk) == 1:
+                    closes = data["Close"].dropna()
+                else:
+                    closes = data[sym]["Close"].dropna()
+                if len(closes) >= 30:
+                    _HISTORY_CACHE[sym] = closes
+            except Exception:
+                continue
+        time.sleep(1)
+
+
+def compute_historical_vol(tk: yf.Ticker, symbol: str | None = None) -> dict:
+    """
+    Compute 20-day and 60-day realized vol (annualized), the 252-day HV20 range
+    (for a crude IV rank), the 3-business-day price change, and the 200-day
+    moving average — all from 1 year of daily closes. Uses the prefetched
+    batch cache when available, otherwise fetches per-ticker.
     """
     out = {"hv20_pct": None, "hv60_pct": None,
            "rv_min_pct": None, "rv_max_pct": None,
-           "price_change_3d": None, "price_change_3d_pct": None}
+           "price_change_3d": None, "price_change_3d_pct": None,
+           "ma200": None}
     try:
-        hist = tk.history(period="1y", interval="1d",
-                          auto_adjust=True, progress=False)
-        if hist is None or len(hist) < 30:
-            return out
-        closes = hist["Close"].dropna()
-        if len(closes) < 30:
+        closes = None
+        if symbol and symbol in _HISTORY_CACHE:
+            closes = _HISTORY_CACHE[symbol]
+        else:
+            hist = tk.history(period="1y", interval="1d",
+                              auto_adjust=True, progress=False)
+            if hist is None or len(hist) < 30:
+                return out
+            closes = hist["Close"].dropna()
+        if closes is None or len(closes) < 30:
             return out
 
         # 3-business-day price change: last close vs close 3 trading days prior.
@@ -139,6 +183,10 @@ def compute_historical_vol(tk: yf.Ticker) -> dict:
                 out["price_change_3d_pct"] = round(
                     (price_now - price_3d_ago) / price_3d_ago * 100.0, 2
                 )
+
+        # 200-day simple moving average of closing price (needs >=200 sessions).
+        if len(closes) >= 200:
+            out["ma200"] = round(float(closes.tail(200).mean()), 2)
 
         log_ret = np.log(closes / closes.shift(1)).dropna()
         rv20 = log_ret.rolling(20).std() * math.sqrt(252) * 100.0
@@ -371,7 +419,7 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
 
         sector = info.get("sector", "") or ""
         industry = info.get("industry", "") or ""
-        hv_data = compute_historical_vol(tk)
+        hv_data = compute_historical_vol(tk, symbol)
         fv_data = compute_fair_value(info, spot)
 
         try:
@@ -535,6 +583,11 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
                     "iv_premium_pct": iv_prem,
                     "hv20_pct": hv_data["hv20_pct"],
                     "hv60_pct": hv_data["hv60_pct"],
+                    "ma200": hv_data["ma200"],
+                    "price_vs_ma200_pct": (
+                        round((spot - hv_data["ma200"]) / hv_data["ma200"] * 100.0, 1)
+                        if hv_data["ma200"] else None
+                    ),
                     "price_change_3d": hv_data["price_change_3d"],
                     "price_change_3d_pct": hv_data["price_change_3d_pct"],
                     "open_interest": oi,
@@ -610,6 +663,9 @@ def main() -> int:
                         help="Min premium per contract in dollars (overrides CONFIG min_premium_dollars).")
     parser.add_argument("--no-exclude-earnings", action="store_true",
                         help="Allow contracts where earnings fall before expiry.")
+    parser.add_argument("--max-workers", type=int, default=None,
+                        help="Parallel ticker fetches (overrides CONFIG max_workers). "
+                             "Lower values reduce yfinance rate-limiting on large scans.")
     args = parser.parse_args()
 
     if args.dte_min is not None:
@@ -624,6 +680,8 @@ def main() -> int:
         CONFIG["min_premium_dollars"] = args.min_premium
     if args.no_exclude_earnings:
         CONFIG["exclude_earnings_before_expiry"] = False
+    if args.max_workers is not None:
+        CONFIG["max_workers"] = args.max_workers
 
     data_out = args.out_dir / "data.json"
     meta_out = args.out_dir / "meta.json"
@@ -632,6 +690,10 @@ def main() -> int:
     tickers = load_tickers(args.tickers)
     print(f"[info] scanning {len(tickers)} tickers from {args.tickers.name}"
           f" -> {args.out_dir}", flush=True)
+
+    prefetch_history(tickers)
+    print(f"[info] prefetched history for {len(_HISTORY_CACHE)}/{len(tickers)} "
+          f"tickers (batch)", flush=True)
 
     all_accepted: list[dict] = []
     all_rejected: list[dict] = []

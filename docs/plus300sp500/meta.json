@@ -1,0 +1,26 @@
+{
+  "last_updated": "2026-09-16T00:34:04.511001+00:00",
+  "label": "+300 S&P 500",
+  "tickers_scanned": 503,
+  "accepted_count": 50,
+  "rejected_count": 21664,
+  "missing_delta_count": 2886,
+  "missing_earnings_count": 0,
+  "tickers_ok": 375,
+  "tickers_failed": 128,
+  "config": {
+    "max_delta": 0.15,
+    "min_delta": 0.1,
+    "min_premium_dollars": 300.0,
+    "max_dte": 90,
+    "min_dte": 30,
+    "min_oi": 100,
+    "max_spread_pct": 20.0,
+    "max_per_ticker": 3,
+    "risk_free_rate": 0.05,
+    "exclude_earnings_before_expiry": false,
+    "premium_basis": "bid",
+    "max_workers": 4
+  },
+  "elapsed_seconds": 102.6
+}

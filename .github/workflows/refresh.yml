@@ -87,7 +87,18 @@ jobs:
 
       - name: Fetch options data — S&P 500
         if: steps.gate.outputs.run == 'true'
-        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/sp500 --label "S&P 500"
+        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/sp500 --max-workers 4 --label "S&P 500"
+
+      # Cooldown so Yahoo's per-IP rate limiter recovers before the second
+      # full 503-ticker scan (two back-to-back S&P scans otherwise starve the
+      # second one — see the +300 S&P step below).
+      - name: Cooldown between heavy S&P scans
+        if: steps.gate.outputs.run == 'true'
+        run: sleep 60
+
+      - name: Fetch options data — +300 S&P 500 (10-15% delta, 30-90 DTE, ≥$300/contract)
+        if: steps.gate.outputs.run == 'true'
+        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir docs/plus300sp500 --min-delta 0.10 --max-delta 0.15 --dte-min 30 --dte-max 90 --min-premium 300 --no-exclude-earnings --max-workers 4 --label "+300 S&P 500"
 
       - name: Upload Pages artifact
         if: steps.gate.outputs.run == 'true'

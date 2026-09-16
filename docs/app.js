@@ -48,6 +48,15 @@
         : '<span class="text-slate-300 text-xs">—</span>' },
     { key: "current_price", label: "Price", type: "number", align: "right",
       render: (r) => fmtMoney(r.current_price) },
+    { key: "ma200", label: "200-DMA", type: "number", align: "right",
+      render: (r) => {
+        if (r.ma200 == null) return '<span class="text-slate-300">—</span>';
+        const pct = r.price_vs_ma200_pct;
+        const cls = pct == null ? "text-slate-500" : (pct >= 0 ? "text-emerald-600" : "text-rose-600");
+        const badge = pct == null ? "" :
+          ` <span class="text-[10px] ${cls}">${pct >= 0 ? "+" : ""}${pct}%</span>`;
+        return `${fmtMoney(r.ma200)}${badge}`;
+      } },
     { key: "price_change_3d_pct", label: "3D Chg", type: "number", align: "right",
       render: (r) => price3dCell(r) },
     { key: "fmv", label: "Fair Value", type: "number", align: "right",
