@@ -94,7 +94,7 @@ jobs:
       # second one — see the +300 S&P step below).
       - name: Cooldown between heavy S&P scans
         if: steps.gate.outputs.run == 'true'
-        run: sleep 60
+        run: sleep 240
 
       - name: Fetch options data — +300 S&P 500 (10-15% delta, 30-90 DTE, ≥$300/contract)
         if: steps.gate.outputs.run == 'true'
