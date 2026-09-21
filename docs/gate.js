@@ -5,7 +5,7 @@
  * out. For true access control, host behind a server (Cloudflare Worker).
  * The plaintext password is NOT in source — only its SHA-256 hash. */
 (function () {
-  var HASH = "bd4fb6f3704394498e59f26450f883b698faf5341cd43f90528021d64c28a413";
+  var HASH = "6df85d68da9f1f949bc43346a2d84643736b955194f25738fd74100ae1874523";
   var KEY = "csp_gate_ok";
   try { if (localStorage.getItem(KEY) === HASH) return; } catch (e) {}
 
