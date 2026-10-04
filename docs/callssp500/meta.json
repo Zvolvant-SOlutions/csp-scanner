@@ -1,0 +1,28 @@
+{
+  "last_updated": "2026-10-04T14:38:58.763756+00:00",
+  "label": "Calls S&P 500",
+  "tickers_scanned": 503,
+  "accepted_count": 100,
+  "rejected_count": 26228,
+  "missing_delta_count": 1793,
+  "missing_earnings_count": 0,
+  "tickers_ok": 368,
+  "tickers_failed": 135,
+  "config": {
+    "side": "call",
+    "max_delta": 0.15,
+    "min_delta": 0.0,
+    "min_premium_dollars": 100.0,
+    "max_dte": 90,
+    "min_dte": 30,
+    "min_oi": 100,
+    "max_spread_pct": 20.0,
+    "max_per_ticker": 5,
+    "top_n": 100,
+    "risk_free_rate": 0.05,
+    "exclude_earnings_before_expiry": false,
+    "premium_basis": "bid",
+    "max_workers": 4
+  },
+  "elapsed_seconds": 105.8
+}

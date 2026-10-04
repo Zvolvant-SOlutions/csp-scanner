@@ -139,9 +139,32 @@ jobs:
           path: out/plus300sp500
           retention-days: 1
 
+  # ── Full S&P 500 calls-to-sell scan (dedicated runner / IP) ────────────────
+  build_calls_sp500:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Fetch options data — Calls to Sell S&P 500 (top 100 OTM calls, ≤15% delta, 30-90 DTE, ≥$100/contract)
+        run: python scripts/fetch.py --tickers config/tickers_sp500.txt --out-dir out/callssp500 --side call --max-delta 0.15 --dte-min 30 --dte-max 90 --min-premium 100 --max-per-ticker 5 --top 100 --no-exclude-earnings --max-workers 4 --label "Calls S&P 500"
+      - name: Upload calls S&P data
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-callssp500
+          path: out/callssp500
+          retention-days: 1
+
   # ── Merge every job's data into docs/ and publish the Pages artifact ───────
   assemble:
-    needs: [gate, build_main, build_sp500, build_plus300sp500]
+    needs: [gate, build_main, build_sp500, build_plus300sp500, build_calls_sp500]
     # Deploy as long as the gate says run and the primary tabs built. The heavy
     # S&P jobs are best-effort: if one fails, its download is skipped and the
     # previously committed data for that tab stays in place.
@@ -165,6 +188,12 @@ jobs:
         with:
           name: site-plus300sp500
           path: docs/plus300sp500
+      - name: Download calls S&P data
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: site-callssp500
+          path: docs/callssp500
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
