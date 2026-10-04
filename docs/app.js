@@ -144,6 +144,7 @@
                  sortDefault: true },
     safest:    { sort: { key: "delta_pct", dir: "asc" }, filter: () => true },
     ann:       { sort: { key: "annualized_premium_pct", dir: "desc" }, filter: () => true },
+    premium:   { sort: { key: "premium_dollars", dir: "desc" }, filter: () => true },
     cushion:   { sort: { key: "assignment_discount_pct", dir: "desc" }, filter: () => true },
     liquidity: { sort: { key: "open_interest", dir: "desc" }, filter: () => true },
     earnsafe:  { sort: { key: "score", dir: "desc" },

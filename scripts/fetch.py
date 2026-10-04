@@ -33,6 +33,7 @@ from scipy.stats import norm
 # Config — also written to meta.json so the UI can display thresholds.
 # ---------------------------------------------------------------------------
 CONFIG = {
+    "side": "put",              # "put" (cash-secured puts) or "call" (calls to sell)
     "max_delta": 0.15,          # absolute delta cutoff
     "min_delta": 0.0,           # absolute delta floor (0 = no floor)
     "min_premium_dollars": 0.0, # min premium per contract in $ (0 = no floor)
@@ -41,6 +42,7 @@ CONFIG = {
     "min_oi": 100,              # minimum open interest
     "max_spread_pct": 20.0,     # bid/ask spread as percent of mid
     "max_per_ticker": 3,        # top N contracts per ticker
+    "top_n": 0,                 # global cap on accepted contracts (0 = no cap)
     "risk_free_rate": 0.05,     # for Black-Scholes
     "exclude_earnings_before_expiry": True,
     "premium_basis": "bid",     # "bid" (conservative) or "mid"
@@ -99,6 +101,16 @@ def bs_put_delta(spot: float, strike: float, t_years: float,
     return float(norm.cdf(d1) - 1.0)
 
 
+def bs_call_delta(spot: float, strike: float, t_years: float,
+                  r: float, sigma: float) -> float | None:
+    """Black-Scholes call delta. Returns a positive value in (0, 1)."""
+    res = _bs_d1_d2(spot, strike, t_years, r, sigma)
+    if res is None:
+        return None
+    d1, _ = res
+    return float(norm.cdf(d1))
+
+
 def bs_pop(spot: float, strike: float, t_years: float,
            r: float, sigma: float) -> float | None:
     """Probability the put expires OTM (stock stays above strike) = N(d2), as %."""
@@ -107,6 +119,16 @@ def bs_pop(spot: float, strike: float, t_years: float,
         return None
     _, d2 = res
     return round(float(norm.cdf(d2)) * 100.0, 1)
+
+
+def bs_pop_call(spot: float, strike: float, t_years: float,
+                r: float, sigma: float) -> float | None:
+    """Probability a short call expires OTM (stock stays below strike) = N(-d2), as %."""
+    res = _bs_d1_d2(spot, strike, t_years, r, sigma)
+    if res is None:
+        return None
+    _, d2 = res
+    return round(float(norm.cdf(-d2)) * 100.0, 1)
 
 
 # ---------------------------------------------------------------------------
@@ -344,17 +366,28 @@ def get_next_earnings_date(tk: yf.Ticker) -> date | None:
 def score_contract(c: dict) -> tuple[float, list[str]]:
     """Returns (score 0-100, notes list)."""
     notes: list[str] = []
+    is_call = c.get("contract_type") == "call"
 
-    # A. Premium efficiency (25 pts) — annualized return on cash secured.
-    # 50% annualized maps to full 25 pts (sigmoid-ish linear cap).
-    ann = c["annualized_premium_pct"]
-    premium_score = min(25.0, max(0.0, ann / 50.0 * 25.0))
+    # A. Premium (25 pts).
+    #   Puts: annualized return on cash secured — 50% annualized = full 25 pts.
+    #   Calls (selling): far-OTM calls earn tiny annualized yield, so instead
+    #     reward the actual dollar premium collected per contract — $500+ = full
+    #     25 pts. This makes "best" surface rich-premium calls, not just the
+    #     safest, cheapest ones.
+    if is_call:
+        premium_score = min(25.0, max(0.0, c["premium_dollars"] / 500.0 * 25.0))
+    else:
+        ann = c["annualized_premium_pct"]
+        premium_score = min(25.0, max(0.0, ann / 50.0 * 25.0))
 
-    # B. Assignment cushion (25 pts) — discount of strike vs spot.
+    # B. Cushion (25 pts).
+    #   Puts: downside discount of strike vs spot.
+    #   Calls: upside room from spot to strike (how far the stock must rally to
+    #     be assigned). Both are stored in assignment_discount_pct.
     disc = c["assignment_discount_pct"]
     cushion_score = min(25.0, max(0.0, disc / 15.0 * 25.0))
     if disc < 0:
-        notes.append("Strike above spot (ITM)")
+        notes.append("Strike inside spot (ITM)")
 
     # C. Delta safety (20 pts). 0% delta -> 20, 15% delta -> 0.
     delta_abs = c["delta_pct"]
@@ -444,15 +477,16 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
             if dte < CONFIG["min_dte"]:
                 continue
 
+            side = CONFIG["side"]
             try:
                 chain = tk.option_chain(exp_str)
-                puts = chain.puts
+                opts_df = chain.calls if side == "call" else chain.puts
             except Exception:
                 continue
 
             t_years = dte / 365.0
 
-            for _, row in puts.iterrows():
+            for _, row in opts_df.iterrows():
                 strike = _safe_float(row.get("strike"))
                 bid = _safe_float(row.get("bid"))
                 ask = _safe_float(row.get("ask"))
@@ -499,9 +533,20 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
                     rejected.append({**base, "reason": "Low liquidity (OI)"})
                     continue
 
+                # Calls to sell: only out-of-the-money strikes (above spot) —
+                # an ITM/ATM call is likely to be assigned, which defeats the
+                # "low likelihood of hitting" goal.
+                if side == "call" and strike <= spot:
+                    rejected.append({**base, "reason": "Call at/in the money"})
+                    continue
+
                 # Delta (Black-Scholes since yfinance doesn't provide it).
-                delta = bs_put_delta(spot, strike, t_years,
-                                     CONFIG["risk_free_rate"], iv)
+                if side == "call":
+                    delta = bs_call_delta(spot, strike, t_years,
+                                          CONFIG["risk_free_rate"], iv)
+                else:
+                    delta = bs_put_delta(spot, strike, t_years,
+                                         CONFIG["risk_free_rate"], iv)
                 if delta is None:
                     rejected.append({**base, "reason": "Missing delta"})
                     continue
@@ -541,15 +586,27 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
                                   f"(${premium_dollars:.0f})",
                     })
                     continue
-                cash_required = strike * 100.0  # one contract = 100 shares
-                breakeven = strike - premium
-                assignment_discount_pct = ((spot - strike) / spot) * 100.0
-                # Annualized return on cash-secured capital.
-                annualized_premium_pct = (premium / strike) \
-                    * (365.0 / dte) * 100.0
-
                 iv_pct_val = iv * 100.0
-                pop = bs_pop(spot, strike, t_years, CONFIG["risk_free_rate"], iv)
+                if side == "call":
+                    # Selling a (covered) call: capital basis is 100 shares at
+                    # spot; "cushion" is the upside room before the strike caps
+                    # you; breakeven is strike + premium; assignment happens if
+                    # the stock finishes above the strike.
+                    cash_required = spot * 100.0
+                    breakeven = strike + premium
+                    assignment_discount_pct = ((strike - spot) / spot) * 100.0
+                    annualized_premium_pct = (premium / spot) \
+                        * (365.0 / dte) * 100.0
+                    pop = bs_pop_call(spot, strike, t_years,
+                                      CONFIG["risk_free_rate"], iv)
+                else:
+                    cash_required = strike * 100.0  # one contract = 100 shares
+                    breakeven = strike - premium
+                    assignment_discount_pct = ((spot - strike) / spot) * 100.0
+                    # Annualized return on cash-secured capital.
+                    annualized_premium_pct = (premium / strike) \
+                        * (365.0 / dte) * 100.0
+                    pop = bs_pop(spot, strike, t_years, CONFIG["risk_free_rate"], iv)
                 iv_rnk = iv_rank_from_rv(iv_pct_val,
                                          hv_data["rv_min_pct"],
                                          hv_data["rv_max_pct"])
@@ -557,6 +614,7 @@ def process_ticker(symbol: str) -> tuple[list[dict], list[dict], dict]:
 
                 contract = {
                     "ticker": symbol,
+                    "contract_type": side,
                     "company_name": name,
                     "sector": sector,
                     "industry": industry,
@@ -651,6 +709,12 @@ def main() -> int:
                         help="Directory to write data.json and meta.json into.")
     parser.add_argument("--label", default="",
                         help="Free-text label written into meta.json.")
+    parser.add_argument("--side", choices=["put", "call"], default=None,
+                        help="Scan cash-secured puts (default) or calls to sell.")
+    parser.add_argument("--top", type=int, default=None,
+                        help="Keep only the global top-N accepted contracts by score.")
+    parser.add_argument("--max-per-ticker", type=int, default=None,
+                        help="Max contracts kept per ticker (overrides CONFIG max_per_ticker).")
     parser.add_argument("--dte-min", type=int, default=None,
                         help="Min DTE (overrides CONFIG min_dte).")
     parser.add_argument("--dte-max", type=int, default=None,
@@ -668,6 +732,12 @@ def main() -> int:
                              "Lower values reduce yfinance rate-limiting on large scans.")
     args = parser.parse_args()
 
+    if args.side is not None:
+        CONFIG["side"] = args.side
+    if args.top is not None:
+        CONFIG["top_n"] = args.top
+    if args.max_per_ticker is not None:
+        CONFIG["max_per_ticker"] = args.max_per_ticker
     if args.dte_min is not None:
         CONFIG["min_dte"] = args.dte_min
     if args.dte_max is not None:
@@ -718,8 +788,10 @@ def main() -> int:
             print(f"[{i}/{len(tickers)}] {t}: "
                   f"{len(acc)} accepted, {len(rej)} rejected", flush=True)
 
-    # Global ranking by score, then assign 1-based rank.
+    # Global ranking by score; optionally keep only the top-N; assign 1-based rank.
     all_accepted.sort(key=lambda c: c["score"], reverse=True)
+    if CONFIG["top_n"] and CONFIG["top_n"] > 0:
+        all_accepted = all_accepted[: CONFIG["top_n"]]
     for i, c in enumerate(all_accepted, 1):
         c["rank"] = i
 

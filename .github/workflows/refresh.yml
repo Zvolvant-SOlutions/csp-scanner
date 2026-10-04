@@ -82,6 +82,8 @@ jobs:
         run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs/medium --dte-min 60 --dte-max 90 --max-delta 0.15 --no-exclude-earnings --label "60-90 DTE"
       - name: Fetch options data — +300 premium (10-15% delta, 30-90 DTE, ≥$300/contract)
         run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs/plus300 --min-delta 0.10 --max-delta 0.15 --dte-min 30 --dte-max 90 --min-premium 300 --no-exclude-earnings --label "+300"
+      - name: Fetch options data — Calls to Sell (top 100 OTM calls, ≤15% delta, 30-90 DTE, ≥$100/contract)
+        run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs/calls --side call --max-delta 0.15 --dte-min 30 --dte-max 90 --min-premium 100 --max-per-ticker 5 --top 100 --no-exclude-earnings --label "Calls to Sell"
       - name: Fetch options data — Dip Buys (top 20 daily losers)
         run: python scripts/fetch_dip.py --sp500-tickers config/tickers_sp500.txt --out-dir docs/dip --label "Dip Buys"
       - name: Upload site (page shells + primary-tab data)
