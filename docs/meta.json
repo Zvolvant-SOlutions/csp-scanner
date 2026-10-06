@@ -1,23 +1,28 @@
 {
-  "last_updated": "2026-05-31T23:08:09.611319+00:00",
+  "last_updated": "2026-10-06T01:36:50.561730+00:00",
+  "label": "Curated \u00b7 30-35 DTE",
   "tickers_scanned": 94,
-  "accepted_count": 120,
-  "rejected_count": 20254,
-  "missing_delta_count": 2453,
-  "missing_earnings_count": 12,
+  "accepted_count": 60,
+  "rejected_count": 2810,
+  "missing_delta_count": 233,
+  "missing_earnings_count": 11,
   "tickers_ok": 94,
   "tickers_failed": 0,
   "config": {
+    "side": "put",
     "max_delta": 0.15,
-    "max_dte": 21,
-    "min_dte": 1,
+    "min_delta": 0.0,
+    "min_premium_dollars": 0.0,
+    "max_dte": 35,
+    "min_dte": 30,
     "min_oi": 100,
     "max_spread_pct": 20.0,
     "max_per_ticker": 3,
+    "top_n": 0,
     "risk_free_rate": 0.05,
-    "exclude_earnings_before_expiry": true,
+    "exclude_earnings_before_expiry": false,
     "premium_basis": "bid",
-    "max_workers": 8
+    "max_workers": 6
   },
-  "elapsed_seconds": 30.0
+  "elapsed_seconds": 19.5
 }

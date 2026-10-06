@@ -37,12 +37,22 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
 
+<!-- Page config — curated universe focused on the ~30 DTE theta sweet spot -->
+<script>
+  window.CSP_PAGE_CONFIG = {
+    defaultMaxDelta: 15,
+    defaultMinDte: 30,
+    defaultMaxDte: 35,
+    defaultExcludeEarnings: false,
+  };
+</script>
+
 <header class="border-b border-slate-200 bg-white">
   <div class="max-w-screen-2xl mx-auto px-6 py-4 flex flex-wrap items-center justify-between gap-3">
     <div>
       <h1 class="text-xl font-semibold">CSP Scanner</h1>
       <p class="text-xs text-slate-500">
-        Cash-secured put opportunities — strict ≤15% delta, ≤21 DTE, earnings-aware
+        Cash-secured put opportunities — ≤15% delta, 30-35 DTE (theta sweet spot), earnings flagged
       </p>
     </div>
     <div class="text-right text-xs text-slate-500">
@@ -130,12 +140,12 @@
       </label>
       <label class="flex flex-col">
         <span class="text-xs text-slate-500 mb-1">Min DTE</span>
-        <input id="f-min-dte" type="number" step="1" value="1"
+        <input id="f-min-dte" type="number" step="1" value="30"
                class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </label>
       <label class="flex flex-col">
         <span class="text-xs text-slate-500 mb-1">Max DTE</span>
-        <input id="f-max-dte" type="number" step="1" value="21"
+        <input id="f-max-dte" type="number" step="1" value="35"
                class="border border-slate-300 rounded px-2 py-1 num focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </label>
       <label class="flex flex-col">
@@ -156,7 +166,7 @@
         </select>
       </label>
       <label class="flex items-end gap-2 pb-1">
-        <input id="f-exclude-earn" type="checkbox" checked class="h-4 w-4" />
+        <input id="f-exclude-earn" type="checkbox" class="h-4 w-4" />
         <span class="text-sm">Exclude earnings before expiry</span>
       </label>
     </div>
@@ -195,11 +205,11 @@
 
     <h3 class="text-sm font-semibold text-slate-700 mt-4 mb-2">Hard filters (excluded before scoring)</h3>
     <ul class="list-disc list-inside text-sm text-slate-600 space-y-1">
-      <li>Put options only, expiring within 21 calendar days</li>
+      <li>Put options only, 30-35 calendar days to expiration (the ~30-DTE theta sweet spot)</li>
       <li>Absolute delta &le; 15%</li>
       <li>Bid &gt; $0, open interest &ge; 100</li>
       <li>Bid/ask spread &le; 20% of the mid price</li>
-      <li>Earnings before expiration (excluded by default; toggle in filters)</li>
+      <li>Earnings are <em>included</em> and flagged (Earn Risk column); use the Earnings-Safe tab or the filter toggle to exclude them</li>
       <li>All of: bid, ask, last price, OI, volume, strike, expiry, IV must be present</li>
     </ul>
 

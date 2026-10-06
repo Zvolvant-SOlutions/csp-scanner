@@ -76,8 +76,8 @@ jobs:
           cache: pip
       - name: Install deps
         run: pip install -r requirements.txt
-      - name: Fetch options data — curated universe
-        run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs --label "Curated"
+      - name: Fetch options data — curated universe (30-35 DTE, ≤15% delta, earnings flagged)
+        run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs --dte-min 30 --dte-max 35 --max-delta 0.15 --no-exclude-earnings --label "Curated · 30-35 DTE"
       - name: Fetch options data — 60-90 DTE medium-term
         run: python scripts/fetch.py --tickers config/tickers.txt --out-dir docs/medium --dte-min 60 --dte-max 90 --max-delta 0.15 --no-exclude-earnings --label "60-90 DTE"
       - name: Fetch options data — +300 premium (10-15% delta, 30-90 DTE, ≥$300/contract)
